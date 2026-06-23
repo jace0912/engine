@@ -10,6 +10,13 @@ function startFresh() {
   return actor;
 }
 
+// Phase 2 makes `survival` a compound state, so its value is now an object
+// like { survival: 'normal' } rather than the bare string 'survival'. This
+// helper keeps the Phase 1 assertions valid against either shape.
+function isInSurvival(value: unknown): boolean {
+  return value === 'survival' || (typeof value === 'object' && value !== null && 'survival' in value);
+}
+
 describe('Safety Override is reachable from every state', () => {
   it('routes to safety from the danger gate and records a SafetyEvent', () => {
     const actor = startFresh();
@@ -36,7 +43,7 @@ describe('Safety Override is reachable from every state', () => {
     const actor = startFresh();
     actor.send({ type: 'NO_DANGER' });
     actor.send({ type: 'CAPACITY_SELECTED', answer: 'B' });
-    expect(actor.getSnapshot().value).toBe('survival');
+    expect(isInSurvival(actor.getSnapshot().value)).toBe(true);
 
     actor.send({ type: 'SAFETY_TRIGGER', flag: 'manual_help_request' });
     expect(actor.getSnapshot().value).toBe('safetyOverride');
@@ -78,7 +85,7 @@ describe('First Check computes and stores a capacity band', () => {
 
     const snap = actor.getSnapshot();
     expect(snap.context.session.currentCapacity).toBe(band);
-    expect(snap.value).toBe('survival'); // Phase 1: all danger-free bands -> survival
+    expect(isInSurvival(snap.value)).toBe(true); // Phase 1: all danger-free bands -> survival
 
     const firstCheck = snap.context.session.events.find((e) => e.type === 'first_check_completed');
     expect(firstCheck).toBeDefined();
@@ -96,7 +103,7 @@ describe('Survival confirm writes an Event and stays in survival', () => {
     actor.send({ type: 'CONFIRM_MOVE', moveId: 'breath' });
     const after = actor.getSnapshot();
 
-    expect(after.value).toBe('survival');
+    expect(isInSurvival(after.value)).toBe(true);
     expect(after.context.session.events.some((e) => e.type === 'move_logged')).toBe(true);
     expect(after.context.session.history.length).toBe(before.history.length + 1);
   });

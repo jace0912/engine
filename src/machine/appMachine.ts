@@ -1,16 +1,28 @@
-// Top-level XState v5 machine for Phase 1.
+// Top-level XState v5 machine.
 //
-//   boot ──(always)──> firstCheck ──> survival
-//                          │
-//   SAFETY_TRIGGER (root, from ANY state) ──> safetyOverride  [terminal/final]
+// Phase 1 (unchanged behaviour): boot -> firstCheck -> survival, with a global
+// terminal safetyOverride reachable from every state.
 //
-// Invariants enforced here:
-//  - The Safety Override is reachable from every state via the root-level
-//    SAFETY_TRIGGER handler, and is a `final` state (terminal for the session,
-//    blocks re-entry into any tool).
-//  - On entry to every (atomic) state, exactly one immutable StateSnapshot is
-//    appended. Compound `firstCheck` delegates to its atomic children, so each
-//    occupied state contributes exactly one snapshot.
+// Phase 2 extends Survival Mode into the Engine 1 movement sub-state layer:
+//
+//   survival (compound, id 'survival')
+//     router (transient) ──> normal | zcfm        (zero capacity routes to zcfm)
+//     normal ──CONFIRM_MOVE──> (2 in a row) recovery | stay
+//            ──REPORT_NEAR_ZERO──> zcfm
+//     zcfm   ──CONFIRM_MOVE──> (2 in a row) recovery | stay
+//            ──CANNOT_MOVE──> immobile
+//     immobile ──WATCH_FOR_WINDOW──> windowDetection        (non-terminal)
+//     windowDetection ──WINDOW_MORE_CAPACITY──> normal
+//                     ──WINDOW_EXTERNAL_CHANGE──> zcfm
+//                     ──WINDOW_NONE──> (stay)
+//     recovery ──CONFIRM_MOVE──> (stay) ; ──TOO_MUCH──> normal
+//
+// Invariants preserved from Phase 1:
+//  - safetyOverride is global (root SAFETY_TRIGGER handler) and `final`/terminal.
+//  - Exactly one immutable StateSnapshot is appended on entry to every atomic
+//    state. Compound `survival` and the transient `router` do not snapshot;
+//    each occupied atomic sub-state contributes exactly one snapshot. A
+//    confirmed move that stays in place also appends one snapshot (as in P1).
 //  - All log mutations go through the append-only helpers in state/session.ts.
 
 import { assign, setup } from 'xstate';
@@ -25,6 +37,9 @@ import {
 } from '../state/session';
 import { bandForAnswer, type CapacityAnswer } from './guards';
 
+/** Two successful moves in a row route the user up into Recovery. */
+export const RECOVERY_THRESHOLD = 2;
+
 export interface AppContext {
   session: Session;
 }
@@ -33,6 +48,13 @@ export type AppEvent =
   | { type: 'NO_DANGER' }
   | { type: 'CAPACITY_SELECTED'; answer: CapacityAnswer }
   | { type: 'CONFIRM_MOVE'; moveId: string }
+  | { type: 'REPORT_NEAR_ZERO' }
+  | { type: 'CANNOT_MOVE' }
+  | { type: 'WATCH_FOR_WINDOW' }
+  | { type: 'WINDOW_MORE_CAPACITY' }
+  | { type: 'WINDOW_EXTERNAL_CHANGE' }
+  | { type: 'WINDOW_NONE' }
+  | { type: 'TOO_MUCH' }
   | { type: 'SAFETY_TRIGGER'; flag: SafetyFlag };
 
 export interface AppInput {
@@ -44,6 +66,9 @@ interface SnapshotParams {
   engine: EngineId;
 }
 
+const TRAP_SNAPSHOT = (stateName: string) =>
+  ({ type: 'writeSnapshot', params: { stateName, engine: 'trap' } }) as const;
+
 export const appMachine = setup({
   types: {
     context: {} as AppContext,
@@ -51,9 +76,13 @@ export const appMachine = setup({
     input: {} as AppInput,
   },
   guards: {
-    // A persisted safety session must resume straight into the override on
-    // boot, so a terminated session can never be re-entered after reload.
+    // Resume a persisted safety session straight into the override on boot.
     sessionInSafety: ({ context }) => context.session.status === 'safety_override',
+    // Near-zero capacity lands directly in ZCFM rather than the normal move.
+    capacityIsZero: ({ context }) => context.session.currentCapacity === 'zero',
+    // This completion will be the second-in-a-row, so route up into Recovery.
+    willReachRecovery: ({ context }) =>
+      context.session.recoveryScore.successfulMovesInARow + 1 >= RECOVERY_THRESHOLD,
   },
   actions: {
     writeSnapshot: assign(({ context }, params: SnapshotParams) => ({
@@ -65,6 +94,18 @@ export const appMachine = setup({
 
     markSurvival: assign(({ context }) => ({
       session: { ...context.session, currentMode: 'survival' as const, engineInUse: 'trap' as const },
+    })),
+
+    setCapacity: assign(({ context }, params: { band: CapacityBand }) => ({
+      session: {
+        ...context.session,
+        currentCapacity: params.band,
+        recoveryScore: {
+          ...context.session.recoveryScore,
+          band: params.band,
+          updatedAt: new Date().toISOString(),
+        },
+      },
     })),
 
     computeBand: assign(({ context, event }) => {
@@ -83,6 +124,28 @@ export const appMachine = setup({
       };
     }),
 
+    incrementStreak: assign(({ context }) => ({
+      session: {
+        ...context.session,
+        recoveryScore: {
+          ...context.session.recoveryScore,
+          successfulMovesInARow: context.session.recoveryScore.successfulMovesInARow + 1,
+          updatedAt: new Date().toISOString(),
+        },
+      },
+    })),
+
+    resetStreak: assign(({ context }) => ({
+      session: {
+        ...context.session,
+        recoveryScore: {
+          ...context.session.recoveryScore,
+          successfulMovesInARow: 0,
+          updatedAt: new Date().toISOString(),
+        },
+      },
+    })),
+
     logFirstCheck: assign(({ context }) => ({
       session: appendEvent(
         context.session,
@@ -99,6 +162,10 @@ export const appMachine = setup({
       };
     }),
 
+    logEvent: assign(({ context }, params: { type: string; payload?: Record<string, unknown> }) => ({
+      session: appendEvent(context.session, makeEvent(context.session, params.type, params.payload ?? {})),
+    })),
+
     recordSafetyEvent: assign(({ context, event }) => {
       const { flag } = event as Extract<AppEvent, { type: 'SAFETY_TRIGGER' }>;
       const withEvent = appendSafetyEvent(context.session, makeSafetyEvent(context.session, flag));
@@ -110,7 +177,7 @@ export const appMachine = setup({
   context: ({ input }) => ({ session: input.session }),
   initial: 'boot',
 
-  // Global safety guard: reachable from every state. Always wins.
+  // Global safety guard: reachable from every state and sub-state. Always wins.
   on: {
     SAFETY_TRIGGER: {
       target: '#safetyOverride',
@@ -131,22 +198,12 @@ export const appMachine = setup({
       initial: 'dangerGate',
       states: {
         dangerGate: {
-          entry: {
-            type: 'writeSnapshot',
-            params: { stateName: 'firstCheck.dangerGate', engine: 'shell' },
-          },
-          // Selecting any danger condition dispatches the global SAFETY_TRIGGER
-          // (handled at the root). "None of these" continues to the capacity read.
+          entry: { type: 'writeSnapshot', params: { stateName: 'firstCheck.dangerGate', engine: 'shell' } },
           on: { NO_DANGER: { target: 'capacityRead' } },
         },
         capacityRead: {
-          entry: {
-            type: 'writeSnapshot',
-            params: { stateName: 'firstCheck.capacityRead', engine: 'shell' },
-          },
+          entry: { type: 'writeSnapshot', params: { stateName: 'firstCheck.capacityRead', engine: 'shell' } },
           on: {
-            // Phase 1: every danger-free band routes to Survival; the computed
-            // band is stored on the session for later phases.
             CAPACITY_SELECTED: {
               target: '#survival',
               actions: ['computeBand', 'logFirstCheck'],
@@ -158,17 +215,109 @@ export const appMachine = setup({
 
     survival: {
       id: 'survival',
-      entry: [
-        'markSurvival',
-        { type: 'writeSnapshot', params: { stateName: 'survival', engine: 'trap' } },
-      ],
-      on: {
-        CONFIRM_MOVE: {
-          // Stay in survival; log the move and append a snapshot.
-          actions: [
-            'logMove',
-            { type: 'writeSnapshot', params: { stateName: 'survival', engine: 'trap' } },
+      entry: 'markSurvival',
+      initial: 'router',
+      states: {
+        // Transient routing node: picks the landing sub-state by capacity.
+        // It is never "occupied", so it writes no snapshot.
+        router: {
+          always: [
+            { guard: 'capacityIsZero', target: 'zcfm' },
+            { target: 'normal' },
           ],
+        },
+
+        normal: {
+          entry: TRAP_SNAPSHOT('survival.normal'),
+          on: {
+            CONFIRM_MOVE: [
+              { guard: 'willReachRecovery', target: 'recovery', actions: ['incrementStreak', 'logMove'] },
+              { actions: ['incrementStreak', 'logMove', TRAP_SNAPSHOT('survival.normal')] },
+            ],
+            REPORT_NEAR_ZERO: {
+              target: 'zcfm',
+              actions: [
+                { type: 'setCapacity', params: { band: 'zero' } },
+                'resetStreak',
+                { type: 'logEvent', params: { type: 'capacity_drop', payload: { from: 'survival.normal' } } },
+              ],
+            },
+          },
+        },
+
+        zcfm: {
+          entry: TRAP_SNAPSHOT('survival.zcfm'),
+          on: {
+            CONFIRM_MOVE: [
+              { guard: 'willReachRecovery', target: 'recovery', actions: ['incrementStreak', 'logMove'] },
+              { actions: ['incrementStreak', 'logMove', TRAP_SNAPSHOT('survival.zcfm')] },
+            ],
+            CANNOT_MOVE: {
+              target: 'immobile',
+              actions: [
+                { type: 'setCapacity', params: { band: 'zero' } },
+                'resetStreak',
+                { type: 'logEvent', params: { type: 'capacity_drop', payload: { from: 'survival.zcfm' } } },
+              ],
+            },
+          },
+        },
+
+        // Non-terminal capacity constraint. Not SafetyOverride, not No-Exit.
+        immobile: {
+          entry: TRAP_SNAPSHOT('survival.immobile'),
+          on: {
+            WATCH_FOR_WINDOW: { target: 'windowDetection' },
+          },
+        },
+
+        windowDetection: {
+          entry: TRAP_SNAPSHOT('survival.windowDetection'),
+          on: {
+            WINDOW_MORE_CAPACITY: {
+              target: 'normal',
+              actions: [
+                { type: 'setCapacity', params: { band: 'low' } },
+                { type: 'logEvent', params: { type: 'window_detected', payload: { via: 'more_capacity' } } },
+              ],
+            },
+            WINDOW_EXTERNAL_CHANGE: {
+              target: 'zcfm',
+              actions: [
+                { type: 'setCapacity', params: { band: 'low' } },
+                { type: 'logEvent', params: { type: 'window_detected', payload: { via: 'external_change' } } },
+              ],
+            },
+            // No window yet: stay, no pressure. Record the check + a snapshot.
+            WINDOW_NONE: {
+              actions: [
+                { type: 'logEvent', params: { type: 'window_checked', payload: { opened: false } } },
+                TRAP_SNAPSHOT('survival.windowDetection'),
+              ],
+            },
+          },
+        },
+
+        recovery: {
+          entry: [
+            { type: 'setCapacity', params: { band: 'recovering' } },
+            { type: 'logEvent', params: { type: 'recovery_entered' } },
+            TRAP_SNAPSHOT('survival.recovery'),
+          ],
+          on: {
+            CONFIRM_MOVE: {
+              actions: ['incrementStreak', 'logMove', TRAP_SNAPSHOT('survival.recovery')],
+            },
+            // Capacity dip / move too much: regress one rung to normal Survival.
+            TOO_MUCH: {
+              target: 'normal',
+              actions: [
+                { type: 'setCapacity', params: { band: 'low' } },
+                'resetStreak',
+                { type: 'logEvent', params: { type: 'capacity_drop', payload: { from: 'survival.recovery' } } },
+              ],
+            },
+          },
         },
       },
     },
