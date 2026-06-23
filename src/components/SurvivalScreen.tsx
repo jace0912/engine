@@ -1,32 +1,33 @@
-// Survival Mode placeholder: one fixed templated move, one confirm button.
-// The SafetyOverlay (mounted by ModeShell) stays visible. Confirm logs a
-// move_logged Event and stays in Survival. Fixed text only — no generation.
+// Survival "normal" sub-state: one fixed templated move + confirm. Confirming
+// logs a move and counts toward Recovery (two in a row). "I can't do this right
+// now" reports near-zero capacity and routes down to ZCFM. Fixed text only.
 
-import { useState } from 'react';
 import type { AppEvent } from '../machine/appMachine';
-import { firstSurvivalMove } from '../content/survivalMoves';
+import { survivalMoves } from '../content/survivalMoves';
 
 interface Props {
   send: (event: AppEvent) => void;
+  count: number;
 }
 
-export function SurvivalScreen({ send }: Props) {
-  // Local UI acknowledgement only; the authoritative record is the session log.
-  const [confirmedCount, setConfirmedCount] = useState(0);
-
-  const confirm = () => {
-    send({ type: 'CONFIRM_MOVE', moveId: firstSurvivalMove.id });
-    setConfirmedCount((n) => n + 1);
-  };
-
+export function SurvivalScreen({ send, count }: Props) {
+  const move = survivalMoves[count % survivalMoves.length];
   return (
     <section>
       <h1>One thing for the next few minutes</h1>
-      <p className="move">{firstSurvivalMove.text}</p>
-      <button type="button" className="choice primary" onClick={confirm}>
-        I did this
-      </button>
-      {confirmedCount > 0 && <p className="muted">Logged. That counts. Take your time.</p>}
+      <p className="move">{move.text}</p>
+      <div className="actions">
+        <button
+          type="button"
+          className="choice primary"
+          onClick={() => send({ type: 'CONFIRM_MOVE', moveId: move.id })}
+        >
+          I did this
+        </button>
+        <button type="button" className="choice" onClick={() => send({ type: 'REPORT_NEAR_ZERO' })}>
+          I can’t do this right now
+        </button>
+      </div>
     </section>
   );
 }

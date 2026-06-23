@@ -99,6 +99,14 @@ p {
   border-left-width: 8px;
 }
 
+/* Stacked action buttons (one move + a gentler alternative). */
+.actions {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-top: 16px;
+}
+
 button:focus-visible {
   outline: 3px solid var(--focus);
   outline-offset: 2px;

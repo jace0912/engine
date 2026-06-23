@@ -62,6 +62,34 @@ is no update or delete path anywhere. A snapshot is written on entry to every
 atomic state (the compound `firstCheck` delegates to its atomic children, so
 each occupied state contributes exactly one snapshot).
 
+## Phase 2 — Survival sub-states (Engine 1 only)
+
+Survival Mode is now a compound state with the Engine 1 movement sub-states.
+The Black Swan Engine remains stubbed; nothing past Phase 2 is built.
+
+```
+survival
+  router ──(zero capacity)──> zcfm ; otherwise ──> normal
+  normal   ──CONFIRM_MOVE ×2──> recovery ; ──REPORT_NEAR_ZERO──> zcfm
+  zcfm     ──CONFIRM_MOVE ×2──> recovery ; ──CANNOT_MOVE──> immobile
+  immobile ──WATCH_FOR_WINDOW──> windowDetection      (non-terminal; never No-Exit)
+  windowDetection ──more capacity──> normal ; ──external change──> zcfm ; ──not yet──> stay
+  recovery ──CONFIRM_MOVE──> stay ; ──TOO_MUCH──> normal   (does NOT unlock Guided Mode)
+```
+
+- **Two-moves rule:** each completed move increments `recoveryScore.successfulMovesInARow`;
+  a capacity drop or "too much" resets it. Two in a row routes to Recovery.
+- **ZCFM** shows one ultra-small move (no money / planning / sustained attention / new
+  skill / external approval / outcome dependency). Success = attempted or completed.
+- **Immobile Constraint** is a non-terminal capacity state — the door still works and
+  waiting counts as the move. It is **not** No-Exit and **not** the Safety Override.
+- **Window Detection** is low-pressure: fixed options, no timers, no countdown.
+- SafetyOverride stays global, terminal, and reachable from every sub-state; one immutable
+  snapshot is still appended on entry to every atomic state.
+
+New content: `content/{zcfmMoves,immobileCopy,windowOptions,recoveryCopy}.ts`.
+New screens: `ZCFMScreen`, `ImmobileScreen`, `WindowDetectionScreen`, `RecoveryScreen`.
+
 ## File map
 
 ```

@@ -27,6 +27,20 @@ const pkg = JSON.parse(readFileSync(join(repoRoot, 'package.json'), 'utf8')) as 
 };
 const allDeps = { ...(pkg.dependencies ?? {}), ...(pkg.devDependencies ?? {}) };
 
+// Phase 2 is Engine 1 sub-states only: the component set must not grow into
+// later-phase surfaces.
+const componentFiles = readdirSync(join(srcDir, 'components')).filter((f) => f.endsWith('.tsx'));
+const ALLOWED_COMPONENTS = new Set([
+  'ModeShell.tsx',
+  'SafetyOverlay.tsx',
+  'FirstCheckScreen.tsx',
+  'SurvivalScreen.tsx',
+  'ZCFMScreen.tsx',
+  'ImmobileScreen.tsx',
+  'WindowDetectionScreen.tsx',
+  'RecoveryScreen.tsx',
+]);
+
 describe('Phase 1 scope guards', () => {
   it('declares no 3D or AI/model dependencies', () => {
     const forbidden = [
@@ -59,6 +73,26 @@ describe('Phase 1 scope guards', () => {
   it('references no 3D / WebGL APIs in source', () => {
     for (const token of ['webgl', '@react-three', 'three.js']) {
       expect(corpusLower).not.toContain(token);
+    }
+  });
+});
+
+describe('Phase 2 scope guards (Engine 1 sub-states only)', () => {
+  it('adds no Guided / Strategy / COR / Observatory / Door Audit components', () => {
+    for (const file of componentFiles) {
+      expect(ALLOWED_COMPONENTS.has(file)).toBe(true);
+    }
+  });
+
+  it('references no later-phase feature components in source', () => {
+    for (const token of [
+      'GuidedModeScreen',
+      'StrategyStageScreen',
+      'CORPanel',
+      'ObservatoryScene',
+      'DoorAuditInterview',
+    ]) {
+      expect(corpus.includes(token)).toBe(false);
     }
   });
 });
