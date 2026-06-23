@@ -6,6 +6,16 @@
 // Note: the build plan calls the per-session log event type `Event`. To avoid
 // colliding with the DOM `Event` global, it is named `SessionEvent` here.
 
+// Phase 2B-0: the Trap Architecture Diagnostic Layer type foundation lives in
+// ./diagnostics. These are types only — no classifier, Door Audit Lite, or
+// selectTarget logic is wired in yet.
+import type {
+  DoorAuditLiteRecord,
+  DoorType,
+  InterventionLogEntry,
+  TrapDiagnosticResult,
+} from './diagnostics';
+
 export type Mode = 'survival' | 'guided' | 'strategy' | 'observatory';
 export type CapacityBand = 'zero' | 'low' | 'recovering' | 'stable' | 'high';
 export type EngineId = 'trap' | 'blackswan' | 'shell';
@@ -83,28 +93,28 @@ export interface RecoveryScore {
   updatedAt: string;
 }
 
-// ---- Engine 1, sealed. STUB ONLY in Phase 1. ----
+// ---- Engine 1, sealed. STUB in Phase 1; Phase 2B-0 adds optional diagnostic
+// holders (type only — left unpopulated, never read or written yet). ----
 export interface TrapEngineState {
   phase: 'survival' | 'zcfm' | 'immobile' | 'window_detection' | 'recovery';
   doors: DoorRecord[]; // append-only
   // never 'no_exit' at system level in any automated path
   activeConstraint: 'capacity' | 'compound' | 'immobile' | null;
   lastMove?: { at: string; move: string; completed: boolean };
+
+  // Phase 2B-0 scaffolding. Optional; not populated, routed on, or rendered yet.
+  diagnosticResult?: TrapDiagnosticResult | null;
+  doorAuditLiteRecords?: DoorAuditLiteRecord[];
+  interventionLog?: InterventionLogEntry[];
 }
 
 export interface DoorRecord {
   id: string;
   at: string;
   label: string;
-  type:
-    | 'sealed'
-    | 'structurally_impossible'
-    | 'predicted_sealed'
-    | 'refused'
-    | 'delayed_dated'
-    | 'delayed_indefinite'
-    | 'unreachable_by_capacity'
-    | 'unsearched';
+  // Aligned with the canonical DoorType union in ./diagnostics (same literals,
+  // single source of truth) rather than re-declaring the union here.
+  type: DoorType;
   note?: string;
 }
 
