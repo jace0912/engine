@@ -9,7 +9,18 @@ import type { CapacityBand, Mode } from '../state/types';
 
 export type CapacityAnswer = 'A' | 'B' | 'C' | 'D';
 
-/** Map a First Check answer (A–D) to a stored capacity band. */
+/**
+ * Map a First Check answer (A–D) to a stored capacity band.
+ *
+ * TODO/roadmap — the 'high' capacity band gap:
+ *   The CapacityBand type includes 'high', but First Check has NO answer that
+ *   maps to it. 'high' is reserved for a future High-Capacity Strategy / 3D
+ *   Observatory unlock (see the build plan, sections 3–5), which requires an
+ *   explicit opt-in path that does not exist yet. It is intentionally
+ *   unreachable from the current four-option First Check. Do not add a 'high'
+ *   answer here until Strategy/Observatory ship — adding one now would imply a
+ *   destination that is not built.
+ */
 export function bandForAnswer(answer: CapacityAnswer): CapacityBand {
   switch (answer) {
     case 'A':

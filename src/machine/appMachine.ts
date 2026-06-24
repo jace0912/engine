@@ -168,7 +168,13 @@ export const appMachine = setup({
 
     recordSafetyEvent: assign(({ context, event }) => {
       const { flag } = event as Extract<AppEvent, { type: 'SAFETY_TRIGGER' }>;
-      const withEvent = appendSafetyEvent(context.session, makeSafetyEvent(context.session, flag));
+      // Provenance: the atomic state active when the trigger fired is the most
+      // recent snapshot (one is written on entry to every atomic state).
+      const originState = context.session.history.at(-1)?.stateName ?? context.session.currentMode;
+      const withEvent = appendSafetyEvent(
+        context.session,
+        makeSafetyEvent(context.session, flag, originState),
+      );
       return { session: { ...withEvent, status: 'safety_override' as const } };
     }),
   },
