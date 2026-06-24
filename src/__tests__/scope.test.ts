@@ -97,19 +97,28 @@ describe('Phase 2 scope guards (Engine 1 sub-states only)', () => {
   });
 });
 
-describe('Phase 2B-0 scope guards (diagnostic types / scaffolding only)', () => {
-  // Definition patterns (not bare words) so the required "does NOT implement …"
-  // comments in diagnostics.ts do not trip these checks.
-  it('defines no classifier, selectTarget, or diagnostic-routing function', () => {
+describe('Phase 2B-1 scope guards (classifier is pure + unwired)', () => {
+  // The proxy classifier (detectTrapDiagnostic) legitimately exists now, but it
+  // must stay unwired, and selectTarget / Door Audit Lite must not be built.
+  // Definition patterns avoid tripping on the "does NOT implement …" comments.
+  it('builds no selectTarget or Door Audit Lite function', () => {
     const definitionPatterns = [
       /function\s+selectTarget\b/,
       /\bselectTarget\s*[:=]\s*(?:\(|function|async)/,
-      /function\s+classif\w*/i,
-      /\bclassif\w*\s*[:=]\s*(?:\(|function|async)/i,
-      /function\s+diagnose\w*/i,
-      /\bdiagnose\w*\s*[:=]\s*(?:\(|function|async)/i,
+      /function\s+\w*[Dd]oorAudit\w*/,
+      /\b(?:build|run)DoorAudit\w*\s*[:=]\s*(?:\(|function|async)/,
     ];
     for (const re of definitionPatterns) expect(re.test(corpus)).toBe(false);
+  });
+
+  it('does not wire the classifier into the machine, components, or App', () => {
+    const wiringCorpus = sourceFiles
+      .filter((f) => f.includes('/machine/') || f.includes('/components/') || f.endsWith('App.tsx'))
+      .map((f) => readFileSync(f, 'utf8'))
+      .join('\n');
+    for (const token of ['detectTrapDiagnostic', 'TrapDiagnosticResult', 'diagnosticResult']) {
+      expect(wiringCorpus.includes(token)).toBe(false);
+    }
   });
 
   it('adds no diagnostic or Door Audit UI component', () => {
