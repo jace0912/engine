@@ -96,3 +96,25 @@ describe('Phase 2 scope guards (Engine 1 sub-states only)', () => {
     }
   });
 });
+
+describe('Phase 2B-0 scope guards (diagnostic types / scaffolding only)', () => {
+  // Definition patterns (not bare words) so the required "does NOT implement …"
+  // comments in diagnostics.ts do not trip these checks.
+  it('defines no classifier, selectTarget, or diagnostic-routing function', () => {
+    const definitionPatterns = [
+      /function\s+selectTarget\b/,
+      /\bselectTarget\s*[:=]\s*(?:\(|function|async)/,
+      /function\s+classif\w*/i,
+      /\bclassif\w*\s*[:=]\s*(?:\(|function|async)/i,
+      /function\s+diagnose\w*/i,
+      /\bdiagnose\w*\s*[:=]\s*(?:\(|function|async)/i,
+    ];
+    for (const re of definitionPatterns) expect(re.test(corpus)).toBe(false);
+  });
+
+  it('adds no diagnostic or Door Audit UI component', () => {
+    for (const file of componentFiles) {
+      expect(/diagnostic|dooraudit/i.test(file)).toBe(false);
+    }
+  });
+});
