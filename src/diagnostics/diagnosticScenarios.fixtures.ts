@@ -95,17 +95,23 @@ export const backfiringConfirmed: Scenario = {
   input: { interventionPresent: true, harmIncreasingOverTime: true, functionDeclining: true, timepoints: 3 },
 };
 
-// ---------------- MODEL_MISMATCH-like evidence ----------------
+// ---------------- MODEL_MISMATCH-like evidence (Phase 2B-3 ladder) ----------------
+// 0 -> none; 1 -> provisional concern only (primary null); 2 -> MEDIUM;
+// 3+ -> HIGH; explicit contradiction -> HIGH.
 export const modelMismatchStrong: Scenario = {
-  name: 'multiple mismatch signals; stated model differs from observed pattern',
-  input: {
-    modelMismatchSignals: 2,
-    statedProblemModel: 'willpower',
-    observedFailurePattern: 'structural_constraint',
-  },
+  name: 'three mismatch signals (no explicit contradiction)',
+  input: { modelMismatchSignals: 3 },
+};
+export const modelMismatchTwo: Scenario = {
+  name: 'two mismatch signals',
+  input: { modelMismatchSignals: 2 },
+};
+export const modelMismatchContradiction: Scenario = {
+  name: 'explicit stated-model-vs-observed-pattern contradiction',
+  input: { statedProblemModel: 'willpower', observedFailurePattern: 'structural_constraint' },
 };
 export const modelMismatchWeak: Scenario = {
-  name: 'a single weak mismatch signal',
+  name: 'a single weak mismatch signal (provisional only)',
   input: { modelMismatchSignals: 1 },
 };
 export const modelMismatchAbsent: Scenario = {
@@ -213,6 +219,8 @@ export const ALL_SCENARIOS: Scenario[] = [
   backfiringTwoTimepoints,
   backfiringConfirmed,
   modelMismatchStrong,
+  modelMismatchTwo,
+  modelMismatchContradiction,
   modelMismatchWeak,
   modelMismatchAbsent,
   competingDifferentCosts,

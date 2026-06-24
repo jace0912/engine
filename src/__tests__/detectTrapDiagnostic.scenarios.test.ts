@@ -24,7 +24,9 @@ import {
   competingValuationNotMatter,
   competingValuationUnknown,
   modelMismatchAbsent,
+  modelMismatchContradiction,
   modelMismatchStrong,
+  modelMismatchTwo,
   modelMismatchWeak,
   noExitCapacityBlocked,
   noExitClean,
@@ -117,24 +119,38 @@ describe('Scenario validation — BACKFIRING', () => {
 });
 
 describe('Scenario validation — MODEL_MISMATCH', () => {
-  it('mismatch signals return MODEL_MISMATCH at HIGH confidence', () => {
-    const r = run(modelMismatchStrong);
-    expect(r.primaryState).toBe('MODEL_MISMATCH');
-    expect(r.confidence).toBe('HIGH');
-  });
-
   it('absent mismatch signals do not produce MODEL_MISMATCH', () => {
     const r = run(modelMismatchAbsent);
     expect(r.primaryState).not.toBe('MODEL_MISMATCH');
     expect(r.findings.some((f) => f.verdict === 'MODEL_MISMATCH')).toBe(false);
   });
 
-  it('a weak signal still classifies but at lower confidence (proportional to strength)', () => {
-    const weak = run(modelMismatchWeak);
-    const strong = run(modelMismatchStrong);
-    const weakFinding = weak.findings.find((f) => f.verdict === 'MODEL_MISMATCH');
-    expect(weakFinding?.confidence).toBe('LOW');
-    expect(strong.confidence).toBe('HIGH');
+  // Phase 2B-3 calibration: one weak signal annotates the file but cannot become
+  // primary; two+ signals (or an explicit contradiction) are required to fire.
+  it('one weak signal is a provisional concern only, never primary', () => {
+    const r = run(modelMismatchWeak);
+    expect(r.primaryState).not.toBe('MODEL_MISMATCH');
+    const finding = r.findings.find((f) => f.verdict === 'MODEL_MISMATCH');
+    expect(finding?.findingType).toBe('PROVISIONAL');
+    expect(finding?.confidence).toBe('LOW');
+  });
+
+  it('two signals return MODEL_MISMATCH with MEDIUM confidence', () => {
+    const r = run(modelMismatchTwo);
+    expect(r.primaryState).toBe('MODEL_MISMATCH');
+    expect(r.confidence).toBe('MEDIUM');
+  });
+
+  it('three or more signals return MODEL_MISMATCH with HIGH confidence', () => {
+    const r = run(modelMismatchStrong);
+    expect(r.primaryState).toBe('MODEL_MISMATCH');
+    expect(r.confidence).toBe('HIGH');
+  });
+
+  it('an explicit stated-vs-observed contradiction returns MODEL_MISMATCH with HIGH confidence', () => {
+    const r = run(modelMismatchContradiction);
+    expect(r.primaryState).toBe('MODEL_MISMATCH');
+    expect(r.confidence).toBe('HIGH');
   });
 });
 

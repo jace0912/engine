@@ -177,15 +177,84 @@ describe('detectTrapDiagnostic — multi-label', () => {
   });
 
   it('three simultaneous patterns raise SYSTEM_OVERLOAD via the simultaneity rule', () => {
-    // No explicit overload count/cascade — overload arises because 3 states fire.
+    // Three genuinely fired core states. Phase 2B-3: a weak single MODEL_MISMATCH
+    // signal does NOT count toward the tally, so two signals are used here so
+    // MODEL_MISMATCH actually fires as the third state.
     const r = run({
       allKnownDoorsSealed: true,
-      enumerationComplete: true, // -> NO_EXIT (provisional)
-      modelMismatchSignals: 1, // -> MODEL_MISMATCH
-      functioningDoorsWithDifferentCosts: true, // -> COMPETING_FAILURES
+      enumerationComplete: true, // -> NO_EXIT (provisional, fired)
+      modelMismatchSignals: 2, // -> MODEL_MISMATCH (fired)
+      functioningDoorsWithDifferentCosts: true, // -> COMPETING_FAILURES (fired)
     });
     expect(r.primaryState).toBe('SYSTEM_OVERLOAD');
     expect(r.secondaryStates).toContain('NO_EXIT');
+  });
+});
+
+describe('detectTrapDiagnostic — MODEL_MISMATCH calibration (Phase 2B-3)', () => {
+  it('zero signals (and no contradiction) produce no MODEL_MISMATCH', () => {
+    const r = run({ modelMismatchSignals: 0 });
+    expect(r.primaryState).not.toBe('MODEL_MISMATCH');
+    expect(r.findings.some((f) => f.verdict === 'MODEL_MISMATCH')).toBe(false);
+  });
+
+  it('one weak signal is never primary, but records a LOW/PROVISIONAL concern', () => {
+    const r = run({ modelMismatchSignals: 1 });
+    expect(r.primaryState).not.toBe('MODEL_MISMATCH');
+    expect(r.primaryState).toBeNull();
+    const finding = r.findings.find((f) => f.verdict === 'MODEL_MISMATCH');
+    expect(finding?.findingType).toBe('PROVISIONAL');
+    expect(finding?.confidence).toBe('LOW');
+  });
+
+  it('one weak signal does NOT count toward SYSTEM_OVERLOAD simultaneity', () => {
+    // The pre-calibration overload trigger: NO_EXIT + 1 weak MM + COMPETING.
+    const r = run({
+      allKnownDoorsSealed: true,
+      enumerationComplete: true, // NO_EXIT (fired)
+      modelMismatchSignals: 1, // weak -> NOT fired
+      functioningDoorsWithDifferentCosts: true, // COMPETING_FAILURES (fired)
+    });
+    expect(r.primaryState).not.toBe('SYSTEM_OVERLOAD');
+    expect(r.findings.some((f) => f.verdict === 'SYSTEM_OVERLOAD')).toBe(false);
+    expect(r.secondaryStates).not.toContain('SYSTEM_OVERLOAD');
+  });
+
+  it('two signals -> MODEL_MISMATCH MEDIUM; three+ -> HIGH', () => {
+    const two = run({ modelMismatchSignals: 2 });
+    expect(two.primaryState).toBe('MODEL_MISMATCH');
+    expect(two.confidence).toBe('MEDIUM');
+
+    const three = run({ modelMismatchSignals: 3 });
+    expect(three.primaryState).toBe('MODEL_MISMATCH');
+    expect(three.confidence).toBe('HIGH');
+  });
+
+  it('explicit contradiction -> MODEL_MISMATCH HIGH (flag or stated-vs-observed)', () => {
+    expect(run({ explicitModelContradiction: true }).confidence).toBe('HIGH');
+    expect(run({ explicitModelContradiction: true }).primaryState).toBe('MODEL_MISMATCH');
+
+    const stated = run({ statedProblemModel: 'willpower', observedFailurePattern: 'structure' });
+    expect(stated.primaryState).toBe('MODEL_MISMATCH');
+    expect(stated.confidence).toBe('HIGH');
+  });
+
+  it('explicit contradiction does not double-count as a weak signal', () => {
+    // Contradiction + one weak signal is still a single HIGH MODEL_MISMATCH,
+    // routed through the strong path — not "weak provisional + extra count".
+    const r = run({ explicitModelContradiction: true, modelMismatchSignals: 1 });
+    const mmFindings = r.findings.filter((f) => f.verdict === 'MODEL_MISMATCH');
+    expect(mmFindings).toHaveLength(1);
+    expect(mmFindings[0].confidence).toBe('HIGH');
+    expect(r.primaryState).toBe('MODEL_MISMATCH');
+  });
+
+  it('a weak signal does not override a stronger primary state', () => {
+    const r = run({ functioningDoorsWithDifferentCosts: true, modelMismatchSignals: 1 });
+    expect(r.primaryState).toBe('COMPETING_FAILURES');
+    expect(r.secondaryStates).not.toContain('MODEL_MISMATCH');
+    // It may still annotate the file as a provisional concern.
+    expect(r.findings.some((f) => f.verdict === 'MODEL_MISMATCH' && f.findingType === 'PROVISIONAL')).toBe(true);
   });
 });
 
