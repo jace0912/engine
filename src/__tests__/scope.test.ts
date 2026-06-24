@@ -111,9 +111,16 @@ describe('Phase 2B-1 scope guards (classifier is pure + unwired)', () => {
     for (const re of definitionPatterns) expect(re.test(corpus)).toBe(false);
   });
 
-  it('does not wire the classifier into the machine, components, or App', () => {
+  it('does not wire the classifier into the machine, components, App, or persistence', () => {
     const wiringCorpus = sourceFiles
-      .filter((f) => f.includes('/machine/') || f.includes('/components/') || f.endsWith('App.tsx'))
+      .filter(
+        (f) =>
+          f.includes('/machine/') ||
+          f.includes('/components/') ||
+          f.endsWith('App.tsx') ||
+          f.endsWith('persistence.ts') ||
+          f.endsWith('session.ts'),
+      )
       .map((f) => readFileSync(f, 'utf8'))
       .join('\n');
     for (const token of ['detectTrapDiagnostic', 'TrapDiagnosticResult', 'diagnosticResult']) {
