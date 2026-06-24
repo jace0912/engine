@@ -26,7 +26,7 @@ describe('append-only log helpers', () => {
   it('appendEvent and appendSafetyEvent each grow by exactly one', () => {
     const s0 = createSession('u');
     const s1 = appendEvent(s0, makeEvent(s0, 'move_logged', { moveId: 'breath' }));
-    const s2 = appendSafetyEvent(s1, makeSafetyEvent(s1, 'manual_help_request'));
+    const s2 = appendSafetyEvent(s1, makeSafetyEvent(s1, 'manual_help_request', 'survival.normal'));
 
     expect(s1.events).toHaveLength(1);
     expect(s2.safetyEvents).toHaveLength(1);

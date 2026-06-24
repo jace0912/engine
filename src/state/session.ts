@@ -7,6 +7,7 @@
 
 import type {
   EngineId,
+  Mode,
   SafetyEvent,
   SafetyFlag,
   Session,
@@ -72,14 +73,29 @@ export function makeEvent(
   return { id: uuid(), sessionId: session.id, at: nowISO(), type, payload };
 }
 
-export function makeSafetyEvent(session: Session, flag: SafetyFlag): SafetyEvent {
+/**
+ * Derive a safety event's originMode from the atomic machine state where it
+ * fired. Phase 2A: `firstCheck.*` -> 'first_check', `survival.*` -> 'survival'.
+ * Future modes (guided/strategy/observatory) extend this mapping later; until
+ * then we fall back to the session's current mode. The pattern is preserved so
+ * those modes are a drop-in addition.
+ */
+export function originModeForState(stateName: string, fallback: Mode): SafetyEvent['originMode'] {
+  if (stateName.startsWith('firstCheck')) return 'first_check';
+  if (stateName.startsWith('survival')) return 'survival';
+  return fallback;
+}
+
+// `originState` is the exact atomic machine state (e.g. 'survival.zcfm') where
+// the trigger fired — passed in so provenance is not lost.
+export function makeSafetyEvent(session: Session, flag: SafetyFlag, originState: string): SafetyEvent {
   return {
     id: uuid(),
     sessionId: session.id,
     at: nowISO(),
     flag,
-    originMode: session.currentMode,
-    originState: session.currentMode,
+    originMode: originModeForState(originState, session.currentMode),
+    originState,
   };
 }
 

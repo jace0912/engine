@@ -9,6 +9,13 @@ describe('First Check answer -> band mapping', () => {
     expect(bandForAnswer('C')).toBe('recovering');
     expect(bandForAnswer('D')).toBe('stable');
   });
+
+  it("never maps a First Check answer to 'high' (reserved for a future Strategy/Observatory unlock)", () => {
+    // Documents the known gap: 'high' exists in CapacityBand but has no First
+    // Check entry path yet, by design. See bandForAnswer's roadmap note.
+    const answers = ['A', 'B', 'C', 'D'] as const;
+    for (const answer of answers) expect(bandForAnswer(answer)).not.toBe('high');
+  });
 });
 
 describe('routing precedence: safety > capacity > requested', () => {

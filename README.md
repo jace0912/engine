@@ -90,6 +90,38 @@ survival
 New content: `content/{zcfmMoves,immobileCopy,windowOptions,recoveryCopy}.ts`.
 New screens: `ZCFMScreen`, `ImmobileScreen`, `WindowDetectionScreen`, `RecoveryScreen`.
 
+## Diagnostics layer (Phase 2B — pure, unwired)
+
+Engine 1 has an early Trap-Architecture diagnostic layer. It is **pure library
+code that is not part of the running app** — it is never imported by the state
+machine, UI, routing, or persistence, so it adds **zero runtime behaviour** (the
+app bundle is unchanged). It exists only to be exercised by tests for now.
+
+- **Phase 2B-0 — type foundation** (`src/state/diagnostics.ts`): the five core
+  `TrapDiagnosticState`s, ten `IntermediateVerdict`s, the eight `DoorType`s
+  (aligned with `DoorRecord`), and the result/record interfaces. Types only.
+- **Phase 2B-1 — proxy classifier** (`src/diagnostics/detectTrapDiagnostic.ts`):
+  `detectTrapDiagnostic(input, now?)` maps proxy signals to a
+  `TrapDiagnosticResult`. It is **pure and deterministic** (inject `now` for a
+  fixed timestamp), never auto-confirms No-Exit (capped at evidence-bounded
+  `PROVISIONAL`, blocked by open questions), needs trajectory for Backfiring,
+  and never overrides the SafetyOverride or movement-state regression.
+- **Phase 2B-2 — validation suite** (`diagnosticScenarios.fixtures.ts` +
+  `detectTrapDiagnostic.scenarios.test.ts`): realistic scenario fixtures that
+  prove the five states diverge cleanly and the safety ceilings hold.
+
+**Not built yet:** no Door Audit Lite, no `selectTarget`, no diagnostic UI, no
+diagnostic routing/persistence, and no Guided Mode, Strategy Mode, COR panel,
+3D, or Observatory.
+
+### Capacity bands — the `high` gap
+
+`CapacityBand` includes `high`, but First Check has no answer that maps to it
+(answers A–D map to `zero`/`low`/`recovering`/`stable`). `high` is **reserved**
+for a future High-Capacity Strategy / 3D Observatory unlock and is intentionally
+unreachable from the current flow until those modes ship. See the roadmap note
+on `bandForAnswer` in `src/machine/guards.ts`.
+
 ## File map
 
 ```
