@@ -97,21 +97,24 @@ describe('Phase 2 scope guards (Engine 1 sub-states only)', () => {
   });
 });
 
-describe('Phase 2B-1 scope guards (classifier is pure + unwired)', () => {
-  // The proxy classifier (detectTrapDiagnostic) legitimately exists now, but it
-  // must stay unwired, and selectTarget / Door Audit Lite must not be built.
-  // Definition patterns avoid tripping on the "does NOT implement …" comments.
-  it('builds no selectTarget or Door Audit Lite function', () => {
+describe('Phase 2B scope guards (classifier + Door Audit Lite are pure + unwired)', () => {
+  // The proxy classifier and (Phase 2B-4) the Door Audit Lite summary legitimately
+  // exist now, but must stay unwired. selectTarget, full/build Door Audit, and a
+  // Door Audit UI must NOT be built. Definition patterns avoid tripping on the
+  // "does NOT implement …" comments and on the allowed summarizeDoorAuditLite.
+  it('builds no selectTarget, build/run Door Audit, or Door Audit UI', () => {
     const definitionPatterns = [
       /function\s+selectTarget\b/,
       /\bselectTarget\s*[:=]\s*(?:\(|function|async)/,
-      /function\s+\w*[Dd]oorAudit\w*/,
+      /function\s+(?:build|run)DoorAudit\w*/,
       /\b(?:build|run)DoorAudit\w*\s*[:=]\s*(?:\(|function|async)/,
+      /DoorAuditInterview/,
+      /DoorAuditScreen/,
     ];
     for (const re of definitionPatterns) expect(re.test(corpus)).toBe(false);
   });
 
-  it('does not wire the classifier into the machine, components, App, or persistence', () => {
+  it('does not wire diagnostics or Door Audit Lite into the machine, components, App, or persistence', () => {
     const wiringCorpus = sourceFiles
       .filter(
         (f) =>
@@ -123,8 +126,31 @@ describe('Phase 2B-1 scope guards (classifier is pure + unwired)', () => {
       )
       .map((f) => readFileSync(f, 'utf8'))
       .join('\n');
-    for (const token of ['detectTrapDiagnostic', 'TrapDiagnosticResult', 'diagnosticResult']) {
+    for (const token of [
+      'detectTrapDiagnostic',
+      'TrapDiagnosticResult',
+      'diagnosticResult',
+      'summarizeDoorAuditLite',
+      'DoorAuditLiteSummary',
+    ]) {
       expect(wiringCorpus.includes(token)).toBe(false);
+    }
+  });
+
+  it('keeps Door Audit Lite pure + standalone (no app/classifier imports, no browser APIs)', () => {
+    const file = sourceFiles.find((f) => f.endsWith('/doorAuditLite.ts'));
+    expect(file).toBeDefined();
+    const src = readFileSync(file as string, 'utf8');
+    const importText = src
+      .split('\n')
+      .filter((l) => /^\s*import\b/.test(l))
+      .join('\n');
+    // It may import door types from state, but nothing runtime/app/classifier.
+    for (const mod of ['react', 'xstate', '/machine/', 'persistence', 'detectTrapDiagnostic']) {
+      expect(importText).not.toContain(mod);
+    }
+    for (const api of ['fetch(', 'localStorage', 'indexedDB', 'XMLHttpRequest', 'new WebSocket']) {
+      expect(src).not.toContain(api);
     }
   });
 
