@@ -115,8 +115,19 @@ app bundle is unchanged). It exists only to be exercised by tests for now.
   SYSTEM_OVERLOAD simultaneity. Two or more signals, or one explicit
   contradiction, are required for MODEL_MISMATCH to become a fired core
   diagnostic state.
+- **Phase 2B-4 — Door Audit Lite foundation** (`src/diagnostics/doorAuditLite.ts`):
+  pure diagnostic infrastructure only. It extends the existing
+  `DoorAuditLiteRecord` scaffold and adds `summarizeDoorAuditLite(records,
+  options?)`, which records and summarizes door evidence as an **evidence
+  ledger, not a decision engine**. It uses the same No-Exit blocker categories
+  as the classifier — refused, delayed, capacity-blocked, unsearched,
+  predicted-sealed, low witness reliability, and incomplete enumeration — and
+  treats an omitted `enumerationComplete` as **incomplete**, so it blocks any
+  premature No-Exit interpretation when mapping is incomplete or uncertain. It
+  never imports or calls the classifier, is not wired into the app, has no UI,
+  no `selectTarget`, and makes no recommendations or AI/model calls.
 
-**Not built yet:** no Door Audit Lite, no `selectTarget`, no diagnostic UI, no
+**Not built yet:** no full Door Audit, no Door Audit UI, no `selectTarget`, no
 diagnostic routing/persistence, and no Guided Mode, Strategy Mode, COR panel,
 3D, or Observatory.
 

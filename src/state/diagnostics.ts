@@ -113,7 +113,11 @@ export interface InterventionTimepoint {
   note?: string;
 }
 
-/** A door observation for the future Door Audit Lite. Type only in 2B-0. */
+/**
+ * A door observation for Door Audit Lite. Phase 2B-4 extends this in place with
+ * optional evidence-ledger fields — all existing fields keep their shape so
+ * earlier records stay compatible. Pure data; no logic lives here.
+ */
 export interface DoorAuditLiteRecord {
   id: string;
   label: string;
@@ -122,6 +126,16 @@ export interface DoorAuditLiteRecord {
   actor?: string; // actor / seat label, if applicable
   note?: string;
   createdAt: string; // ISO-8601
+
+  // ---- Phase 2B-4 Door Audit Lite ledger fields (all optional) ----
+  evidence?: string[]; // short evidence notes supporting the classification
+  blockerReason?: string; // why this door is currently blocked, if it is
+  dateOrWindow?: string; // for delayed doors: the date/window it may open
+  capacityRequirement?: string; // for capacity-blocked doors: what is needed
+  witnessReliability?: 'high' | 'medium' | 'low' | 'unknown';
+  // Whether this door has been mapped. Omitted defaults to mapped, EXCEPT an
+  // 'unsearched' door, which the summary treats as unmapped.
+  mapped?: boolean;
 }
 
 /** An intervention observation. Trajectory (timepoints) supports Backfiring. */
