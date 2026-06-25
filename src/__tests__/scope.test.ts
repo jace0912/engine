@@ -160,3 +160,37 @@ describe('Phase 2B scope guards (classifier + Door Audit Lite are pure + unwired
     }
   });
 });
+
+describe('Phase 2B-5 scope guards (independent layers, no shared blocker constant)', () => {
+  const readSrc = (suffix: string) =>
+    readFileSync(sourceFiles.find((f) => f.endsWith(suffix)) as string, 'utf8');
+  const importLines = (src: string) =>
+    src
+      .split('\n')
+      .filter((l) => /^\s*import\b/.test(l))
+      .join('\n');
+
+  it('the classifier does not import Door Audit Lite', () => {
+    const imports = importLines(readSrc('/detectTrapDiagnostic.ts'));
+    for (const token of ['doorAuditLite', 'summarizeDoorAuditLite', 'DoorAuditLiteSummary']) {
+      expect(imports).not.toContain(token);
+    }
+  });
+
+  it('Door Audit Lite does not import the classifier', () => {
+    expect(importLines(readSrc('/doorAuditLite.ts'))).not.toContain('detectTrapDiagnostic');
+  });
+
+  it('introduces no shared blocker-category constant in production diagnostics', () => {
+    // Neither production diagnostic module exports a shared blocker-category list,
+    // and neither imports one — so the reconciliation test compares two genuinely
+    // independent implementations and can still detect drift.
+    for (const suffix of ['/detectTrapDiagnostic.ts', '/doorAuditLite.ts', '/state/diagnostics.ts']) {
+      const src = readSrc(suffix);
+      expect(/export\s+const\s+\w*[Bb]locker\w*/.test(src)).toBe(false);
+    }
+    for (const suffix of ['/detectTrapDiagnostic.ts', '/doorAuditLite.ts']) {
+      expect(importLines(readSrc(suffix))).not.toContain('locker');
+    }
+  });
+});
