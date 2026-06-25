@@ -109,6 +109,12 @@ app bundle is unchanged). It exists only to be exercised by tests for now.
 - **Phase 2B-2 — validation suite** (`diagnosticScenarios.fixtures.ts` +
   `detectTrapDiagnostic.scenarios.test.ts`): realistic scenario fixtures that
   prove the five states diverge cleanly and the safety ceilings hold.
+- **Phase 2B-3 — MODEL_MISMATCH calibration**: MODEL_MISMATCH does not become a
+  primary diagnostic state from a single weak signal. A single weak signal
+  produces only a provisional model-fit concern and does not count toward
+  SYSTEM_OVERLOAD simultaneity. Two or more signals, or one explicit
+  contradiction, are required for MODEL_MISMATCH to become a fired core
+  diagnostic state.
 
 **Not built yet:** no Door Audit Lite, no `selectTarget`, no diagnostic UI, no
 diagnostic routing/persistence, and no Guided Mode, Strategy Mode, COR panel,

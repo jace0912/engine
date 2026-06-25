@@ -55,6 +55,7 @@ export interface TrapDiagnosticProxyInput {
   statedProblemModel?: string;
   observedFailurePattern?: string;
   modelMismatchSignals?: number; // count of mismatch signals (proxy)
+  explicitModelContradiction?: boolean; // a clear stated-vs-observed contradiction
 
   // Competing failures
   functioningDoorsWithDifferentCosts?: boolean;
@@ -207,20 +208,37 @@ export function detectTrapDiagnostic(
     addVerdict('PREMATURE_ASSESSMENT', 'LOW', ['A single timepoint cannot confirm Backfiring.']);
   }
 
-  // ---------- Model mismatch ----------
-  let mismatchSignals = input.modelMismatchSignals ?? 0;
-  if (
-    input.statedProblemModel &&
-    input.observedFailurePattern &&
-    input.statedProblemModel !== input.observedFailurePattern
-  ) {
-    mismatchSignals += 1;
-  }
-  if (mismatchSignals > 0) {
-    const confidence: DiagnosticConfidence =
-      mismatchSignals >= 3 ? 'HIGH' : mismatchSignals === 2 ? 'MEDIUM' : 'LOW';
-    addState('MODEL_MISMATCH', 'STRUCTURAL', confidence, [
+  // ---------- Model mismatch (Phase 2B-3 calibration) ----------
+  // Thin evidence annotates the file; it does not steer the system. A single
+  // weak signal is a provisional model-fit concern only — NOT a fired core
+  // state, so it cannot become primary and does not count toward the
+  // SYSTEM_OVERLOAD simultaneity tally. Two+ signals, or one explicit
+  // stated-vs-observed contradiction, are required for a fired MODEL_MISMATCH.
+  // Explicit contradiction is a separate strong path; it is not also counted as
+  // a generic weak signal.
+  const explicitContradiction =
+    input.explicitModelContradiction === true ||
+    (Boolean(input.statedProblemModel) &&
+      Boolean(input.observedFailurePattern) &&
+      input.statedProblemModel !== input.observedFailurePattern);
+  const mismatchSignals = input.modelMismatchSignals ?? 0;
+
+  if (explicitContradiction) {
+    addState('MODEL_MISMATCH', 'STRUCTURAL', 'HIGH', [
+      'The stated problem model explicitly contradicts the observed failure pattern.',
+    ]);
+  } else if (mismatchSignals >= 3) {
+    addState('MODEL_MISMATCH', 'STRUCTURAL', 'HIGH', [
       'The response model does not fit the observed failure pattern.',
+    ]);
+  } else if (mismatchSignals === 2) {
+    addState('MODEL_MISMATCH', 'STRUCTURAL', 'MEDIUM', [
+      'The response model may not fit the observed failure pattern.',
+    ]);
+  } else if (mismatchSignals === 1) {
+    // Annotate only — provisional, never a fired core state.
+    addFinding('MODEL_MISMATCH', 'PROVISIONAL', 'LOW', [
+      'A single weak signal: a provisional model-fit concern, not a confirmed mismatch.',
     ]);
   }
 
