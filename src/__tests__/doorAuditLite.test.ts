@@ -107,6 +107,26 @@ describe('summarizeDoorAuditLite — No-Exit blockers (incomplete/uncertain mapp
   });
 });
 
+describe('summarizeDoorAuditLite — mapped omitted stays on the safe side', () => {
+  it('a sealed door with mapped omitted keeps the incomplete-mapping caveat by default', () => {
+    // Preferred check: doorType 'sealed', `mapped` omitted, enumeration omitted.
+    const s = summarizeDoorAuditLite([door('sealed')]);
+    // It counts as mapped (backward-compatible) ...
+    expect(s.mappedDoors).toBe(1);
+    // ... but No-Exit stays blocked, so the caveat is never silently dropped ...
+    expect(s.noExitBlockedByIncompleteMapping).toBe(true);
+    // ... and the summary never marks enumeration complete on its own, so
+    // allKnownMappedDoorsBlocked cannot imply completeness by accident.
+    expect(s.enumerationComplete).toBe(false);
+  });
+
+  it('mapped:false is unmapped and keeps No-Exit blocked even when enumeration is claimed complete', () => {
+    const s = summarizeDoorAuditLite([door('sealed', { mapped: false })], { enumerationComplete: true });
+    expect(s.unmappedDoors).toBe(1);
+    expect(s.noExitBlockedByIncompleteMapping).toBe(true);
+  });
+});
+
 describe('summarizeDoorAuditLite — safe language', () => {
   const battery = [
     summarizeDoorAuditLite([]),
