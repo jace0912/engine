@@ -149,6 +149,38 @@ app bundle is unchanged). It exists only to be exercised by tests for now.
 diagnostic routing/persistence, and no Guided Mode, Strategy Mode, COR panel,
 3D, or Observatory.
 
+## Phase 3-0 — Guided Recovery Boundary Scaffold
+
+Phase 3-0 defines the **boundary** for a future Guided Recovery — what it is
+allowed to do before it does anything — as pure scaffolding
+(`src/recovery/guidedRecoveryBoundary.ts`). It is **not** Guided Recovery, not a
+UI, and not wired into the running app; like the diagnostics layer it is pure
+library code exercised only by tests.
+
+- Guided Recovery is for **stabilizing capacity after Survival Recovery**. The
+  core rule: **Phase 3 restores capacity; Phase 4 chooses strategy.**
+- `evaluateGuidedRecoveryBoundary(input)` returns **permission only**, never a
+  recovery action. It uses strict precedence — **SafetyOverride → survival state
+  → capacity band → user intent** — and **SafetyOverride always wins**: when it
+  is active the decision is `blocked_by_safety_override` regardless of every
+  other field. Entry is allowed only from the stable Survival `recovery` footing
+  (two steady moves in a row), with `recovering`/`stable` capacity and a
+  `stabilize`/`unknown` intent. `high` capacity is **blocked** here (reserved for
+  a later Strategy phase), never routed into strategy.
+- Every decision carries the constant guarantees `mustNotDiagnose`,
+  `mustNotRecommend`, `mustNotSelectStrategy`, `mustNotGiveTreatmentInstruction`,
+  and `mustNotActAsTherapy` as `true` — even when entry is allowed.
+- Guided Recovery copy is **static framing only**, not a micro-step catalog:
+  there is no recovery-step library, no generated or personalized instructions,
+  no recommendations. The copy contract and every rule carry
+  `displayPermissionGranted: false` and `mustNotRecommend: true`, so defining
+  safe language grants **no** permission to surface Guided Recovery — that is a
+  later, gated phase.
+- Guided Recovery does not diagnose, select strategy, recommend actions, provide
+  therapy, or give medical/treatment instructions. SafetyOverride remains
+  supreme, and Phase 3 stays separate from Phase 4 Strategy Mode. No Guided
+  Recovery UI or runtime wiring exists yet.
+
 ### Capacity bands — the `high` gap
 
 `CapacityBand` includes `high`, but First Check has no answer that maps to it
