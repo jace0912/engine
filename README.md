@@ -126,6 +126,11 @@ app bundle is unchanged). It exists only to be exercised by tests for now.
   premature No-Exit interpretation when mapping is incomplete or uncertain. It
   never imports or calls the classifier, is not wired into the app, has no UI,
   no `selectTarget`, and makes no recommendations or AI/model calls.
+- **Phase 2B-5 — reconciliation tests**: proves Door Audit Lite blocker flags and
+  classifier No-Exit blockers stay aligned. This remains test-only / pure
+  diagnostic validation and adds no runtime wiring. No shared blocker-category
+  constant is introduced, so the tests can detect drift between the two
+  independently implemented layers.
 
 **Not built yet:** no full Door Audit, no Door Audit UI, no `selectTarget`, no
 diagnostic routing/persistence, and no Guided Mode, Strategy Mode, COR panel,
