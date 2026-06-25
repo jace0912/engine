@@ -131,6 +131,19 @@ app bundle is unchanged). It exists only to be exercised by tests for now.
   diagnostic validation and adds no runtime wiring. No shared blocker-category
   constant is introduced, so the tests can detect drift between the two
   independently implemented layers.
+- **Phase 2B-6 — diagnostic readout copy contract**
+  (`src/diagnostics/diagnosticReadoutCopy.ts`): a **static** safety contract for
+  how diagnostic findings MAY eventually be displayed — the approved labels,
+  descriptions, required qualifiers, allowed frames, and the banned-phrase list —
+  exposed by the single no-argument API `getDiagnosticCopyContract()`. It is
+  **not a formatter**: it never takes a live `TrapDiagnosticResult` and never
+  assembles display text from classifier output. Every rule carries
+  `displayPermissionGranted: false` and `mustNotRecommend: true`, so defining
+  safe language for a state grants **no** permission to surface it (that is a
+  later phase with its own gate). No-Exit copy stays evidence-bounded ("a
+  statement about the file, not about the world"), and Backfiring copy is
+  pattern-only — it routes any next step to a qualified person and is never a
+  treatment instruction. Pure, deterministic, deep-frozen, and unwired.
 
 **Not built yet:** no full Door Audit, no Door Audit UI, no `selectTarget`, no
 diagnostic routing/persistence, and no Guided Mode, Strategy Mode, COR panel,

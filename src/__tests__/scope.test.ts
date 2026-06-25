@@ -132,6 +132,9 @@ describe('Phase 2B scope guards (classifier + Door Audit Lite are pure + unwired
       'diagnosticResult',
       'summarizeDoorAuditLite',
       'DoorAuditLiteSummary',
+      'getDiagnosticCopyContract',
+      'DiagnosticCopyContract',
+      'diagnosticReadoutCopy',
     ]) {
       expect(wiringCorpus.includes(token)).toBe(false);
     }
@@ -191,6 +194,64 @@ describe('Phase 2B-5 scope guards (independent layers, no shared blocker constan
     }
     for (const suffix of ['/detectTrapDiagnostic.ts', '/doorAuditLite.ts']) {
       expect(importLines(readSrc(suffix))).not.toContain('locker');
+    }
+  });
+});
+
+describe('Phase 2B-6 scope guards (copy contract is a pure static contract, not a formatter)', () => {
+  const readSrc = (suffix: string) =>
+    readFileSync(sourceFiles.find((f) => f.endsWith(suffix)) as string, 'utf8');
+
+  it('builds no diagnostic-result formatter or action-selector function', () => {
+    // The copy contract must stay static: no function that takes a live
+    // TrapDiagnosticResult and renders display text, and no action selector.
+    for (const token of [
+      'formatDiagnosticReadout',
+      'renderDiagnosticReadout',
+      'buildDiagnosticReadout',
+      'summarizeDiagnosticResultForDisplay',
+      'chooseAction',
+      'recommendNextMove',
+    ]) {
+      expect(corpus.includes(token)).toBe(false);
+    }
+  });
+
+  it('keeps the copy contract pure + standalone (no live result, no app imports, no browser APIs, no clock/random)', () => {
+    const src = readSrc('/diagnosticReadoutCopy.ts');
+    const importText = src
+      .split('\n')
+      .filter((l) => /^\s*import\b/.test(l))
+      .join('\n');
+    // Imports only static diagnostic *types* — never a live result, the
+    // classifier, Door Audit Lite, React/XState, persistence, or the session.
+    for (const mod of [
+      'TrapDiagnosticResult',
+      'detectTrapDiagnostic',
+      'doorAuditLite',
+      'react',
+      'xstate',
+      '/machine/',
+      'persistence',
+      'session',
+    ]) {
+      expect(importText).not.toContain(mod);
+    }
+    // Strip comments first, so prose like "no Math.random" in the file header
+    // cannot create a false positive, then assert the CODE uses no clock,
+    // randomness, or I/O.
+    const code = src.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/.*$/gm, '');
+    for (const api of [
+      'new Date',
+      'Date.now',
+      'Math.random',
+      'fetch(',
+      'localStorage',
+      'indexedDB',
+      'XMLHttpRequest',
+      'new WebSocket',
+    ]) {
+      expect(code).not.toContain(api);
     }
   });
 });
