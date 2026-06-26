@@ -222,6 +222,43 @@ recommendations, and no strategy selection.
   only the `GuidedRecoveryEntryStatus` **type** from the boundary (erased at
   build); it stays pure and unwired, so the app bundle is unchanged.
 
+## Phase 3-2 — Guided Recovery Copy Contract
+
+Phase 3-2 defines **static copy rules** for a future Guided Recovery — what its
+copy is allowed to sound like — in a pure module
+(`src/recovery/guidedRecoveryCopy.ts`), before any UI, runtime wiring, recovery
+steps, prompts, or user-facing flow exists. Copy contract only.
+
+- It adds exactly one getter, `getGuidedRecoveryStageCopyContract()`, returning a
+  deep-frozen `GuidedRecoveryStageCopyContract` (version, `approvedFrameExamples`,
+  `stageRules`, `requiredQualifiers`, `bannedPhrases`, `forbiddenBehaviors`). It
+  **does not** alter, rename, move, or call the Phase 3-0
+  `getGuidedRecoveryCopyContract()` in `guidedRecoveryBoundary.ts`, which stays
+  untouched.
+- It adds **no** Guided Recovery UI, no runtime wiring, no recovery step library,
+  no reflection prompts, no journaling prompts, no exercises, no coping
+  techniques, and no user-facing dialogue flow.
+- It grants **no** display permission and **no** runtime permission:
+  `displayPermissionGranted` and `runtimePermissionGranted` are `false` (and
+  `mustNotRecommend` is `true`) on the contract, every `approvedFrameExamples`
+  entry, and every stage rule. `approvedFrameExamples[].text` is **static
+  contract metadata only — not display-ready copy and never rendered directly.**
+- Frame examples are categorised (`orientation`, `capacity`, `safety_boundary`,
+  `uncertainty`, `mode_separation`, `handoff`, `closure`). Stage rules cover the
+  Phase 3-1 stage labels as **constraints, not content**.
+- It remains **subordinate to SafetyOverride** (copy preserves "SafetyOverride
+  remains higher priority" / "if safety is active, Guided Recovery is
+  unavailable", and never softens or bypasses it) and **separate from Phase 4
+  Strategy Mode** (no strategy/target/route/action selection, recommendation, or
+  diagnostic-to-action language). **Reflection** is extra-fenced (no reflection
+  questions, journaling prompts, "how do you feel" framing, trauma/emotional
+  processing, or clinical framing), **handoff** must not recommend/route or point
+  toward a later mode, and **closure** must not imply resolution, success,
+  healing, readiness, safety, completion, or stability.
+- The module is pure and unwired: it imports only the `GuidedRecoveryStage`
+  **type** from the state module (erased at build), calls no factory/evaluator/
+  diagnostic getter, and is tree-shaken out — the app bundle is unchanged.
+
 ### Capacity bands — the `high` gap
 
 `CapacityBand` includes `high`, but First Check has no answer that maps to it

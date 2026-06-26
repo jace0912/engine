@@ -449,3 +449,121 @@ describe('Phase 3-1 scope guards (Guided Recovery state foundation is pure + unw
     }
   });
 });
+
+describe('Phase 3-2 scope guards (Guided Recovery copy contract is pure + unwired, type-only state import)', () => {
+  const copyFile = sourceFiles.find((f) => f.endsWith('/guidedRecoveryCopy.ts'));
+  const readCopy = () => readFileSync(copyFile as string, 'utf8');
+  const importLinesOf = (src: string) => src.split('\n').filter((l) => /^\s*import\b/.test(l));
+  const codeOf = (src: string) => src.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/.*$/gm, '');
+
+  it('exists', () => {
+    expect(copyFile).toBeDefined();
+  });
+
+  it('imports from state as TYPE-ONLY, never the boundary or anything runtime/app/diagnostic', () => {
+    const lines = importLinesOf(readCopy());
+    for (const line of lines) {
+      expect(/^\s*import\s+type\b/.test(line)).toBe(true);
+    }
+    const importText = lines.join('\n');
+    for (const mod of [
+      'react',
+      'xstate',
+      '/machine/',
+      'persistence',
+      'session',
+      'detectTrapDiagnostic',
+      'doorAuditLite',
+      'diagnosticReadoutCopy',
+      'guidedRecoveryBoundary',
+    ]) {
+      expect(importText).not.toContain(mod);
+    }
+    if (importText.includes('guidedRecoveryState')) {
+      expect(/import\s+type\b[^\n]*guidedRecoveryState/.test(importText)).toBe(true);
+    }
+  });
+
+  it('calls no factory, evaluator, or copy/diagnostic getter from other modules', () => {
+    const code = codeOf(readCopy());
+    for (const call of [
+      'createInactiveGuidedRecoveryState(',
+      'createAvailableGuidedRecoveryState(',
+      'isGuidedRecoveryState(',
+      'evaluateGuidedRecoveryBoundary(',
+      'getGuidedRecoveryCopyContract(',
+      'getDiagnosticCopyContract(',
+      'detectTrapDiagnostic(',
+      'summarizeDoorAuditLite(',
+    ]) {
+      expect(code).not.toContain(call);
+    }
+  });
+
+  it('defines the fixed getter and NOT a duplicate Phase 3-0 getter', () => {
+    const src = readCopy();
+    expect(/export\s+function\s+getGuidedRecoveryStageCopyContract\b/.test(src)).toBe(true);
+    expect(/export\s+function\s+getGuidedRecoveryCopyContract\b/.test(src)).toBe(false);
+  });
+
+  it('is pure — no clock, randomness, or I/O', () => {
+    const code = codeOf(readCopy());
+    for (const api of [
+      'new Date',
+      'Date.now',
+      'Math.random',
+      'fetch(',
+      'localStorage',
+      'indexedDB',
+      'XMLHttpRequest',
+      'new WebSocket',
+    ]) {
+      expect(code).not.toContain(api);
+    }
+  });
+
+  it('defines no step-library / prompt / dialogue / selector export (name-level)', () => {
+    const src = readCopy();
+    for (const name of [
+      'nextRecoveryStep',
+      'recommendRecoveryStep',
+      'chooseRecoveryAction',
+      'selectTarget',
+      'chooseAction',
+      'recommendNextMove',
+      'buildRecoveryDialogue',
+      'generateRecoveryPrompt',
+      'formatGuidedRecoveryScreen',
+      'renderGuidedRecoveryCopy',
+    ]) {
+      expect(new RegExp(`\\b${name}\\b`).test(src)).toBe(false);
+    }
+    expect(
+      /export\s+(?:const|function|interface|type)\s+\w*(?:steplibrary|microsteps|recoverysteps|movecatalog|actioncatalog|reflectionprompts|journalingprompts|userfacingdialogue)\w*/i.test(
+        src,
+      ),
+    ).toBe(false);
+  });
+
+  it('is not wired into the machine, components, App, persistence, or session', () => {
+    const wiringCorpus = sourceFiles
+      .filter(
+        (f) =>
+          f.includes('/machine/') ||
+          f.includes('/components/') ||
+          f.endsWith('App.tsx') ||
+          f.endsWith('persistence.ts') ||
+          f.endsWith('session.ts'),
+      )
+      .map((f) => readFileSync(f, 'utf8'))
+      .join('\n');
+    for (const token of [
+      'guidedRecoveryCopy',
+      'getGuidedRecoveryStageCopyContract',
+      'GuidedRecoveryStageCopyContract',
+      'GuidedRecoveryFrameExample',
+    ]) {
+      expect(wiringCorpus.includes(token)).toBe(false);
+    }
+  });
+});
