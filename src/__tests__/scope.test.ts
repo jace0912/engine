@@ -259,16 +259,17 @@ describe('Phase 2B-6 scope guards (copy contract is a pure static contract, not 
 describe('Phase 3-0 scope guards (Guided Recovery boundary is pure + unwired)', () => {
   const grFile = sourceFiles.find((f) => f.endsWith('/guidedRecoveryBoundary.ts'));
 
-  it('exists, and NO other source file references Guided Recovery (zero runtime reference)', () => {
+  it('no source OUTSIDE src/recovery references Guided Recovery (no app/runtime/diagnostic leak)', () => {
     expect(grFile).toBeDefined();
-    // Preferred Phase 3-0 behavior: no runtime import at all. The boundary is
-    // imported only by tests, so no non-test source other than the module
-    // itself may mention it.
+    // The pure recovery modules (boundary, state foundation) may reference each
+    // other; nothing else — machine, App, components, persistence, session,
+    // diagnostics — may mention Guided Recovery at all.
     for (const f of sourceFiles) {
-      if (f === grFile) continue;
+      if (f.includes('/recovery/')) continue;
       const src = readFileSync(f, 'utf8');
       expect(src.includes('GuidedRecovery')).toBe(false);
       expect(src.includes('guidedRecoveryBoundary')).toBe(false);
+      expect(src.includes('guidedRecoveryState')).toBe(false);
     }
   });
 
@@ -336,6 +337,115 @@ describe('Phase 3-0 scope guards (Guided Recovery boundary is pure + unwired)', 
   it('adds no Guided Recovery (or any Guided) UI component', () => {
     for (const file of componentFiles) {
       expect(/guided/i.test(file)).toBe(false);
+    }
+  });
+});
+
+describe('Phase 3-1 scope guards (Guided Recovery state foundation is pure + unwired, type-only boundary import)', () => {
+  const stateFile = sourceFiles.find((f) => f.endsWith('/guidedRecoveryState.ts'));
+  const readState = () => readFileSync(stateFile as string, 'utf8');
+  const importLines = (src: string) => src.split('\n').filter((l) => /^\s*import\b/.test(l));
+
+  it('exists', () => {
+    expect(stateFile).toBeDefined();
+  });
+
+  it('imports from the boundary as TYPE-ONLY, and nothing runtime/app/diagnostic', () => {
+    const lines = importLines(readState());
+    // Every import statement must be a type-only import (erased at build).
+    for (const line of lines) {
+      expect(/^\s*import\s+type\b/.test(line)).toBe(true);
+    }
+    const importText = lines.join('\n');
+    for (const mod of [
+      'react',
+      'xstate',
+      '/machine/',
+      'persistence',
+      'session',
+      'detectTrapDiagnostic',
+      'doorAuditLite',
+      'diagnosticReadoutCopy',
+    ]) {
+      expect(importText).not.toContain(mod);
+    }
+    // The boundary reference, if present, is the type-only entry-status import.
+    if (importText.includes('guidedRecoveryBoundary')) {
+      expect(/import\s+type\b[^\n]*guidedRecoveryBoundary/.test(importText)).toBe(true);
+    }
+  });
+
+  it('does not call the boundary evaluator or copy contract at runtime', () => {
+    const code = readState()
+      .replace(/\/\*[\s\S]*?\*\//g, '')
+      .replace(/\/\/.*$/gm, '');
+    expect(code).not.toContain('evaluateGuidedRecoveryBoundary(');
+    expect(code).not.toContain('getGuidedRecoveryCopyContract(');
+  });
+
+  it('is pure — no clock, randomness, or I/O', () => {
+    const code = readState()
+      .replace(/\/\*[\s\S]*?\*\//g, '')
+      .replace(/\/\/.*$/gm, '');
+    for (const api of [
+      'new Date',
+      'Date.now',
+      'Math.random',
+      'fetch(',
+      'localStorage',
+      'indexedDB',
+      'XMLHttpRequest',
+      'new WebSocket',
+    ]) {
+      expect(code).not.toContain(api);
+    }
+  });
+
+  it('defines no step-library, catalog, runtime-transition, or selector export (name-level)', () => {
+    const src = readState();
+    for (const name of [
+      'createActiveGuidedRecoveryState',
+      'createPausedGuidedRecoveryState',
+      'enterGuidedRecovery',
+      'startGuidedRecovery',
+      'nextRecoveryStep',
+      'recommendRecoveryStep',
+      'chooseRecoveryAction',
+      'selectTarget',
+      'chooseAction',
+      'recommendNextMove',
+    ]) {
+      expect(new RegExp(`\\b${name}\\b`).test(src)).toBe(false);
+    }
+    // No exported identifier named like a step/catalog/instruction library.
+    expect(
+      /export\s+(?:const|function|interface|type)\s+\w*(?:steps|microsteps|recoverysteps|steplibrary|movecatalog|actioncatalog|instructions|exercises|protocol|catalog)\w*/i.test(
+        src,
+      ),
+    ).toBe(false);
+  });
+
+  it('is not wired into the machine, components, App, persistence, or session', () => {
+    const wiringCorpus = sourceFiles
+      .filter(
+        (f) =>
+          f.includes('/machine/') ||
+          f.includes('/components/') ||
+          f.endsWith('App.tsx') ||
+          f.endsWith('persistence.ts') ||
+          f.endsWith('session.ts'),
+      )
+      .map((f) => readFileSync(f, 'utf8'))
+      .join('\n');
+    for (const token of [
+      'guidedRecoveryState',
+      'GuidedRecoveryState',
+      'createInactiveGuidedRecoveryState',
+      'createAvailableGuidedRecoveryState',
+      'GuidedRecoveryStage',
+      'GuidedRecoveryStatus',
+    ]) {
+      expect(wiringCorpus.includes(token)).toBe(false);
     }
   });
 });
