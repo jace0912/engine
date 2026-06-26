@@ -255,3 +255,87 @@ describe('Phase 2B-6 scope guards (copy contract is a pure static contract, not 
     }
   });
 });
+
+describe('Phase 3-0 scope guards (Guided Recovery boundary is pure + unwired)', () => {
+  const grFile = sourceFiles.find((f) => f.endsWith('/guidedRecoveryBoundary.ts'));
+
+  it('exists, and NO other source file references Guided Recovery (zero runtime reference)', () => {
+    expect(grFile).toBeDefined();
+    // Preferred Phase 3-0 behavior: no runtime import at all. The boundary is
+    // imported only by tests, so no non-test source other than the module
+    // itself may mention it.
+    for (const f of sourceFiles) {
+      if (f === grFile) continue;
+      const src = readFileSync(f, 'utf8');
+      expect(src.includes('GuidedRecovery')).toBe(false);
+      expect(src.includes('guidedRecoveryBoundary')).toBe(false);
+    }
+  });
+
+  it('is pure + standalone (no imports at all, no browser APIs, no clock/random)', () => {
+    const src = readFileSync(grFile as string, 'utf8');
+    const importText = src
+      .split('\n')
+      .filter((l) => /^\s*import\b/.test(l))
+      .join('\n');
+    // The boundary module has NO imports whatsoever — nothing runtime, app,
+    // diagnostic, React/XState, persistence, or session can leak in.
+    expect(importText.trim()).toBe('');
+    for (const mod of [
+      'react',
+      'xstate',
+      '/machine/',
+      'persistence',
+      'session',
+      'detectTrapDiagnostic',
+      'doorAuditLite',
+      'diagnosticReadoutCopy',
+    ]) {
+      expect(importText).not.toContain(mod);
+    }
+    // Strip comments so header prose ("no randomness", etc.) cannot create a
+    // false positive, then assert the CODE uses no clock, randomness, or I/O.
+    const code = src.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/.*$/gm, '');
+    for (const api of [
+      'new Date',
+      'Date.now',
+      'Math.random',
+      'fetch(',
+      'localStorage',
+      'indexedDB',
+      'XMLHttpRequest',
+      'new WebSocket',
+    ]) {
+      expect(code).not.toContain(api);
+    }
+  });
+
+  it('is not wired into the machine, components, App, persistence, or session', () => {
+    const wiringCorpus = sourceFiles
+      .filter(
+        (f) =>
+          f.includes('/machine/') ||
+          f.includes('/components/') ||
+          f.endsWith('App.tsx') ||
+          f.endsWith('persistence.ts') ||
+          f.endsWith('session.ts'),
+      )
+      .map((f) => readFileSync(f, 'utf8'))
+      .join('\n');
+    for (const token of [
+      'evaluateGuidedRecoveryBoundary',
+      'GuidedRecoveryBoundaryDecision',
+      'GuidedRecoveryBoundaryInput',
+      'getGuidedRecoveryCopyContract',
+      'guidedRecoveryBoundary',
+    ]) {
+      expect(wiringCorpus.includes(token)).toBe(false);
+    }
+  });
+
+  it('adds no Guided Recovery (or any Guided) UI component', () => {
+    for (const file of componentFiles) {
+      expect(/guided/i.test(file)).toBe(false);
+    }
+  });
+});
