@@ -184,6 +184,44 @@ library code exercised only by tests.
   supreme, and Phase 3 stays separate from Phase 4 Strategy Mode. No Guided
   Recovery UI or runtime wiring exists yet.
 
+## Phase 3-1 — Guided Recovery Type / State Foundation
+
+Phase 3-1 defines the **state shape** for a future Guided Recovery
+(`src/recovery/guidedRecoveryState.ts`) — stage/status unions, boundary + permission
+flags, session slots, and abstract stage metadata — **before** any UI, runtime
+wiring, or recovery steps exist. It is type/state foundation only: it adds no
+Guided Recovery UI, no runtime wiring, no recovery step library, no
+recommendations, and no strategy selection.
+
+- `GuidedRecoveryStage` (`not_started`/`orientation`/`capacity_check`/
+  `stabilization`/`reflection`/`handoff`/`closed`) and `GuidedRecoveryStatus`
+  (`inactive`/`available`/`active`/`paused`/`blocked_by_safety_override`/`closed`)
+  are closed label unions. `active`/`paused` are **reserved** future values —
+  Phase 3-1 adds no `createActive`/`createPaused` or any transition helper.
+- The factory is **allowed-only**: `createAvailableGuidedRecoveryState(input)`
+  returns an `available` state **only** when `entryStatus === 'allowed'`; every
+  blocked entry status yields a blocked state that preserves the `entryStatus`
+  (SafetyOverride → `blocked_by_safety_override`, otherwise `inactive`) — never
+  `available`/`active`. It stores a caller-supplied `entryStatus` and **does not**
+  evaluate entry policy (it never calls `evaluateGuidedRecoveryBoundary`).
+- Every state keeps boundary flags literal `true` (`mustNotDiagnose`,
+  `mustNotRecommend`, `mustNotSelectStrategy`, `mustNotGiveTreatmentInstruction`,
+  `mustNotActAsTherapy`, `mustStayEvidenceBounded`, `mustRemainCapacityFocused`)
+  and permission flags `displayPermissionGranted: false` /
+  `runtimePermissionGranted: false` — even under SafetyOverride. Defining the
+  shape grants **no** permission to display, run, route, persist, or enter Guided
+  Recovery.
+- Stage definitions are **labels only** and authorize no recovery prompts,
+  reflection questions, journaling prompts, exercises, coping techniques,
+  concrete steps, treatment guidance, strategy, recommendations, or user-facing
+  dialogue. There is **no** `notes` (or other free-form text) slot, and no
+  strategy/target/action/recommendation/plan/route/COR field.
+- Any timestamp fields are **caller-supplied strings only** (the module never
+  calls a clock), and `copyContractVersion` is a caller-supplied string that adds
+  no versioning behavior to `getGuidedRecoveryCopyContract`. The module imports
+  only the `GuidedRecoveryEntryStatus` **type** from the boundary (erased at
+  build); it stays pure and unwired, so the app bundle is unchanged.
+
 ### Capacity bands — the `high` gap
 
 `CapacityBand` includes `high`, but First Check has no answer that maps to it
