@@ -100,7 +100,8 @@ describe('Phase 3-0 §6 — SafetyOverride is supreme', () => {
   it('no other input combination produces blocked_by_safety_override, and none sets mustUseSafetyOverride', () => {
     const survivalStates = ['normal', 'zcfm', 'immobile', 'windowDetection', 'recovery'] as const;
     const bands = ['zero', 'low', 'recovering', 'stable', 'high'] as const;
-    const intents = ['stabilize', 'diagnose', 'strategy', 'medical_or_treatment', 'unknown'] as const;
+    // Includes `undefined` to confirm a missing intent never yields the safety status.
+    const intents = ['stabilize', 'diagnose', 'strategy', 'medical_or_treatment', 'unknown', undefined] as const;
     for (const survivalState of survivalStates) {
       for (const capacityBand of bands) {
         for (const userIntent of intents) {
@@ -185,8 +186,50 @@ describe('Phase 3-0 §entry — intent blocks with distinct statuses', () => {
   });
 });
 
+describe('Phase 3-0 §entry — missing gate inputs fail safe (no fail-open)', () => {
+  it('missing userIntent blocks with blocked_by_missing_intent even when all else would allow', () => {
+    // safety off, recovery, moves>=2, recovering capacity — but no intent given.
+    const { userIntent: _omit, ...noIntent } = ALLOWED_BASE;
+    const d = evaluateGuidedRecoveryBoundary(noIntent);
+    expect(d.allowed).toBe(false);
+    expect(d.status).toBe('blocked_by_missing_intent');
+    expect(d.mayShowGuidedRecovery).toBe(false);
+    expect(d.mustStayInSurvival).toBe(true);
+    expect(d.mustUseSafetyOverride).toBe(false);
+    expectAllMustNots(d);
+  });
+
+  it('explicit userIntent "unknown" still allows when all other entry conditions pass', () => {
+    const d = evaluateGuidedRecoveryBoundary({ ...ALLOWED_BASE, userIntent: 'unknown' });
+    expect(d.allowed).toBe(true);
+    expect(d.status).toBe('allowed');
+  });
+
+  it('absent userIntent is NOT treated as "unknown" — undefined blocks, unknown allows', () => {
+    const { userIntent: _omit, ...noIntent } = ALLOWED_BASE;
+    expect(evaluateGuidedRecoveryBoundary(noIntent).allowed).toBe(false);
+    expect(evaluateGuidedRecoveryBoundary({ ...ALLOWED_BASE, userIntent: 'unknown' }).allowed).toBe(true);
+  });
+
+  it('all missing optional gate inputs fail safe to their own block status', () => {
+    const { capacityBand: _b, ...noBand } = ALLOWED_BASE;
+    const { successfulMovesInARow: _m, ...noMoves } = ALLOWED_BASE;
+    const { userIntent: _i, ...noIntent } = ALLOWED_BASE;
+    expect(evaluateGuidedRecoveryBoundary(noBand).status).toBe('blocked_by_insufficient_capacity');
+    expect(evaluateGuidedRecoveryBoundary(noMoves).status).toBe('blocked_by_survival_not_stable');
+    expect(evaluateGuidedRecoveryBoundary(noIntent).status).toBe('blocked_by_missing_intent');
+    for (const input of [noBand, noMoves, noIntent]) {
+      const d = evaluateGuidedRecoveryBoundary(input);
+      expect(d.allowed).toBe(false);
+      expect(d.mustStayInSurvival).toBe(true);
+      expect(d.mustUseSafetyOverride).toBe(false);
+    }
+  });
+});
+
 describe('Phase 3-0 §return-contract — totals are consistent on every branch', () => {
   // A representative decision for each reachable status.
+  const { userIntent: _omitIntent, ...MISSING_INTENT } = ALLOWED_BASE;
   const samples: GuidedRecoveryBoundaryInput[] = [
     ALLOWED_BASE, // allowed
     { ...ALLOWED_BASE, safetyOverrideActive: true }, // safety
@@ -197,6 +240,7 @@ describe('Phase 3-0 §return-contract — totals are consistent on every branch'
     { ...ALLOWED_BASE, userIntent: 'diagnose' }, // diagnose
     { ...ALLOWED_BASE, userIntent: 'strategy' }, // strategy
     { ...ALLOWED_BASE, userIntent: 'medical_or_treatment' }, // medical
+    MISSING_INTENT, // missing intent (fail safe)
   ];
 
   it('mayShowGuidedRecovery always equals allowed', () => {
@@ -325,6 +369,7 @@ describe('Phase 3-0 §8 — safe-language ceiling (no banned phrase in any displ
   });
 
   it('the evaluator reason strings also stay clean of banned phrases', () => {
+    const { userIntent: _omitIntent, ...missingIntent } = ALLOWED_BASE;
     const inputs: GuidedRecoveryBoundaryInput[] = [
       ALLOWED_BASE,
       { ...ALLOWED_BASE, safetyOverrideActive: true },
@@ -335,6 +380,7 @@ describe('Phase 3-0 §8 — safe-language ceiling (no banned phrase in any displ
       { ...ALLOWED_BASE, userIntent: 'diagnose' },
       { ...ALLOWED_BASE, userIntent: 'strategy' },
       { ...ALLOWED_BASE, userIntent: 'medical_or_treatment' },
+      missingIntent,
     ];
     for (const input of inputs) {
       const lower = evaluateGuidedRecoveryBoundary(input).reason.toLowerCase();

@@ -164,9 +164,12 @@ library code exercised only by tests.
   → capacity band → user intent** — and **SafetyOverride always wins**: when it
   is active the decision is `blocked_by_safety_override` regardless of every
   other field. Entry is allowed only from the stable Survival `recovery` footing
-  (two steady moves in a row), with `recovering`/`stable` capacity and a
-  `stabilize`/`unknown` intent. `high` capacity is **blocked** here (reserved for
-  a later Strategy phase), never routed into strategy.
+  (two steady moves in a row), with `recovering`/`stable` capacity and an
+  explicit `stabilize`/`unknown` intent. `high` capacity is **blocked** here
+  (reserved for a later Strategy phase), never routed into strategy. Missing gate
+  inputs fail safe and block: an absent `capacityBand` or `successfulMovesInARow`
+  blocks, and an absent `userIntent` is `blocked_by_missing_intent` — distinct
+  from the explicit typed value `unknown`, which may pass.
 - Every decision carries the constant guarantees `mustNotDiagnose`,
   `mustNotRecommend`, `mustNotSelectStrategy`, `mustNotGiveTreatmentInstruction`,
   and `mustNotActAsTherapy` as `true` — even when entry is allowed.

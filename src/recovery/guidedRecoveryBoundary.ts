@@ -32,7 +32,8 @@ export type GuidedRecoveryEntryStatus =
   | 'blocked_by_excess_capacity_strategy_band'
   | 'blocked_by_diagnose_request'
   | 'blocked_by_strategy_request'
-  | 'blocked_by_medical_or_treatment_request';
+  | 'blocked_by_medical_or_treatment_request'
+  | 'blocked_by_missing_intent';
 
 // ---- Decision (return contract) -----------------------------------------
 // The mustNot* flags are LITERAL `true`: they are constant safety guarantees on
@@ -175,10 +176,19 @@ export function evaluateGuidedRecoveryBoundary(
       'Guided Recovery gives no medical or treatment guidance of any kind. This request is out of scope.',
     );
   }
+  // Missing intent is a MISSING GATE INPUT — fail safe. 'unknown' is an explicit
+  // typed value that may pass; an absent/undefined intent means the gate received
+  // no intent information, so it blocks rather than failing open.
+  if (input.userIntent !== 'stabilize' && input.userIntent !== 'unknown') {
+    return blocked(
+      'blocked_by_missing_intent',
+      'No intent information was provided. Guided Recovery fails safe when a required gate input is missing.',
+    );
+  }
 
   // Allowed: stable recovery footing + sufficient (recovering/stable) capacity
-  // + no danger + a stabilizing/unknown intent. Permission only — still no
-  // diagnosis, recommendation, strategy, treatment, or therapy.
+  // + no danger + an explicit stabilize/unknown intent. Permission only — still
+  // no diagnosis, recommendation, strategy, treatment, or therapy.
   return allow(
     'A stable Survival recovery footing with recovering or stable capacity and no danger present. Guided Recovery may open as a small, stoppable, non-strategy stabilizing space; it still offers no diagnosis, no recommendation, and no strategy.',
   );
