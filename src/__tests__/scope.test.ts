@@ -567,3 +567,116 @@ describe('Phase 3-2 scope guards (Guided Recovery copy contract is pure + unwire
     }
   });
 });
+
+describe('Phase 3-3 scope guards (micro-step candidate catalog is pure + unwired, type-only state import)', () => {
+  const stepFile = sourceFiles.find((f) => f.endsWith('/guidedRecoveryMicroSteps.ts'));
+  const readStep = () => readFileSync(stepFile as string, 'utf8');
+  const importLinesOf = (src: string) => src.split('\n').filter((l) => /^\s*import\b/.test(l));
+  const codeOf = (src: string) => src.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/.*$/gm, '');
+
+  it('exists', () => {
+    expect(stepFile).toBeDefined();
+  });
+
+  it('imports from state as TYPE-ONLY, never the boundary/copy or anything runtime/app/diagnostic', () => {
+    const lines = importLinesOf(readStep());
+    for (const line of lines) {
+      expect(/^\s*import\s+type\b/.test(line)).toBe(true);
+    }
+    const importText = lines.join('\n');
+    for (const mod of [
+      'react',
+      'xstate',
+      '/machine/',
+      'persistence',
+      'session',
+      'detectTrapDiagnostic',
+      'doorAuditLite',
+      'diagnosticReadoutCopy',
+      'guidedRecoveryBoundary',
+      'guidedRecoveryCopy',
+    ]) {
+      expect(importText).not.toContain(mod);
+    }
+    if (importText.includes('guidedRecoveryState')) {
+      expect(/import\s+type\b[^\n]*guidedRecoveryState/.test(importText)).toBe(true);
+    }
+  });
+
+  it('calls no factory, evaluator, or copy/diagnostic getter from other modules', () => {
+    const code = codeOf(readStep());
+    for (const call of [
+      'evaluateGuidedRecoveryBoundary(',
+      'getGuidedRecoveryCopyContract(',
+      'getGuidedRecoveryStageCopyContract(',
+      'createInactiveGuidedRecoveryState(',
+      'createAvailableGuidedRecoveryState(',
+      'isGuidedRecoveryState(',
+      'detectTrapDiagnostic(',
+      'summarizeDoorAuditLite(',
+      'getDiagnosticCopyContract(',
+    ]) {
+      expect(code).not.toContain(call);
+    }
+  });
+
+  it('is pure — no clock, randomness, or I/O', () => {
+    const code = codeOf(readStep());
+    for (const api of [
+      'new Date',
+      'Date.now',
+      'Math.random',
+      'fetch(',
+      'localStorage',
+      'indexedDB',
+      'XMLHttpRequest',
+      'new WebSocket',
+    ]) {
+      expect(code).not.toContain(api);
+    }
+  });
+
+  it('defines the fixed getter and no selection/ranking/recommendation/transition export (name-level)', () => {
+    const src = readStep();
+    expect(/export\s+function\s+getGuidedRecoveryMicroStepCatalog\b/.test(src)).toBe(true);
+    for (const name of [
+      'getNextRecoveryStep',
+      'getRecommendedRecoveryStep',
+      'chooseRecoveryStep',
+      'selectRecoveryStep',
+      'rankRecoverySteps',
+      'filterRecoveryStepsForUser',
+      'personalizeRecoveryStep',
+      'recommendRecoveryStep',
+      'nextRecoveryStep',
+      'chooseRecoveryAction',
+      'recommendNextMove',
+      'selectTarget',
+      'chooseAction',
+    ]) {
+      expect(new RegExp(`\\b${name}\\b`).test(src)).toBe(false);
+    }
+  });
+
+  it('is not wired into the machine, components, App, persistence, or session', () => {
+    const wiringCorpus = sourceFiles
+      .filter(
+        (f) =>
+          f.includes('/machine/') ||
+          f.includes('/components/') ||
+          f.endsWith('App.tsx') ||
+          f.endsWith('persistence.ts') ||
+          f.endsWith('session.ts'),
+      )
+      .map((f) => readFileSync(f, 'utf8'))
+      .join('\n');
+    for (const token of [
+      'guidedRecoveryMicroSteps',
+      'getGuidedRecoveryMicroStepCatalog',
+      'GuidedRecoveryMicroStepCatalog',
+      'GuidedRecoveryMicroStepCandidate',
+    ]) {
+      expect(wiringCorpus.includes(token)).toBe(false);
+    }
+  });
+});

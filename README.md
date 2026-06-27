@@ -259,6 +259,47 @@ steps, prompts, or user-facing flow exists. Copy contract only.
   **type** from the state module (erased at build), calls no factory/evaluator/
   diagnostic getter, and is tree-shaken out — the app bundle is unchanged.
 
+## Phase 3-3 — Recovery Micro-Step Candidate Catalog
+
+Phase 3-3 defines a **static candidate catalog** for future Guided Recovery
+(`src/recovery/guidedRecoveryMicroSteps.ts`). Candidates are **inert
+placeholders** that exist only to exercise the catalog shape, constraints, and
+safety tests — they are **not** approved user-facing recovery content. A later
+content/display/selection phase must review candidates again before any user
+exposure.
+
+- It adds one getter, `getGuidedRecoveryMicroStepCatalog()`, returning a
+  deep-frozen `GuidedRecoveryMicroStepCatalog` (version, `candidates`,
+  `bannedPhrases`, `forbiddenBehaviors`). It does **not** display, select, rank,
+  recommend, personalize, adapt, generate, execute, route, or persist
+  candidates, and adds no `getNextRecoveryStep`/`selectRecoveryStep`/
+  `rankRecoverySteps`/etc.
+- It grants **no** permission: `displayPermissionGranted`,
+  `runtimePermissionGranted`, `selectionPermissionGranted`,
+  `recommendationPermissionGranted`, and `persistencePermissionGranted` are all
+  `false` (and `mustNotRecommend` is `true`) on the catalog and **every**
+  candidate. Each candidate also carries stop-safe flags (`mustBeOptional`,
+  `mustBeSkippable`, `mustBeStopSafe`, `mustNotRequirePhysicalExertion`,
+  `mustNotRequireMemoryRecall`, `mustNotRequireWriting`, …) all `true`.
+- **Candidate labels and purposes are structural metadata only — not
+  display-ready copy, not instructions, not activities, and never rendered
+  directly.** Each label names an inert stage slot (`"orientation slot marker"`,
+  `"capacity slot marker"`, `"stabilization slot marker"`, `"review slot
+  marker"`, `"handoff slot marker"`, `"closure slot marker"`); each purpose is a
+  fixed structural template (`"Defines an inert <category> placeholder in the
+  catalog; grants no display, selection, recommendation, persistence, or runtime
+  permission."`). No candidate describes what a user does, feels, notices,
+  remembers, changes, tries, practices, or completes.
+- Candidates use **`compatibleStages`** (non-exclusive compatibility metadata —
+  no ordering, routing, selection, or display), not a single-stage route. There
+  are no concrete recovery actions, reflection/journaling prompts, exercises, or
+  coping techniques; reflection/handoff/closure-compatible candidates are extra
+  fenced. SafetyOverride priority is preserved (`bypassing SafetyOverride` is a
+  forbidden behavior) and Phase 3 stays separate from Phase 4 Strategy Mode.
+- The module is pure and unwired: it imports only the `GuidedRecoveryStage`
+  **type** from the state module (erased at build), calls no factory/evaluator/
+  copy/diagnostic getter, and is tree-shaken out — the app bundle is unchanged.
+
 ### Capacity bands — the `high` gap
 
 `CapacityBand` includes `high`, but First Check has no answer that maps to it
