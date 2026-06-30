@@ -300,6 +300,36 @@ exposure.
   **type** from the state module (erased at build), calls no factory/evaluator/
   copy/diagnostic getter, and is tree-shaken out — the app bundle is unchanged.
 
+## Phase 3-4 — Guided Recovery UI Shell
+
+Phase 3-4 defines an **inert UI shell boundary** for a future Guided Recovery
+(`src/recovery/GuidedRecoveryShell.tsx`). It is a non-functional preview only —
+deliberately kept **out of `src/components/`** (the live component tree) and
+imported **only by tests**, so it is never routed, rendered, entered, or bundled
+into runtime.
+
+- It adds **no** runtime Guided Recovery behavior, **no** route, **no**
+  navigation item, **no** appMachine state/transition, and **no** persistence or
+  session field. It does not render in the live app and does not appear in the
+  runtime JS bundle (the app bundle stays byte-identical).
+- `GuidedRecoveryShell()` is a **static, non-interactive** component with **no
+  props/inputs**, an `aria-hidden="true"` root, and **no** buttons, links, forms,
+  inputs, event/keyboard handlers, `href`, `role="button"`, or `tabIndex`. It
+  renders **only** these approved non-operational placeholder strings and nothing
+  else: *"Guided Recovery shell placeholder." / "No Guided Recovery runtime is
+  enabled." / "No recovery steps are displayed in this shell." / "This shell
+  grants no display, selection, recommendation, persistence, or runtime
+  permission." / "SafetyOverride remains higher priority."*
+- It grants **no** display/runtime/selection/recommendation/persistence
+  permission and implies no permission to use Guided Recovery. It renders **no**
+  micro-step candidate, **no** copy-contract frame example, and **no** step,
+  prompt, instruction, or recommendation; it imports/calls **none** of the
+  Phase 3-0…3-3 getters/evaluator/factories.
+- It stays **subordinate to SafetyOverride** (no softening/bypass language) and
+  **separate from Phase 4 Strategy Mode** (no strategy/target/route/action or
+  recommendation language). The shell has **zero non-test importers** and is not
+  exported through any barrel file.
+
 ### Capacity bands — the `high` gap
 
 `CapacityBand` includes `high`, but First Check has no answer that maps to it

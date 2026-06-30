@@ -680,3 +680,118 @@ describe('Phase 3-3 scope guards (micro-step candidate catalog is pure + unwired
     }
   });
 });
+
+describe('Phase 3-4 scope guards (Guided Recovery UI shell is inert, unwired, zero non-test importers)', () => {
+  const shellFile = sourceFiles.find((f) => f.endsWith('/GuidedRecoveryShell.tsx'));
+  const readShell = () => readFileSync(shellFile as string, 'utf8');
+  const codeOf = (src: string) => src.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/.*$/gm, '');
+
+  it('exists and lives OUTSIDE the live component tree (src/components is unchanged)', () => {
+    expect(shellFile).toBeDefined();
+    expect(shellFile?.includes('/components/')).toBe(false);
+    // The live component set is still exactly the allowed screens.
+    for (const file of componentFiles) expect(ALLOWED_COMPONENTS.has(file)).toBe(true);
+    // No component barrel/index exists to import or re-export the shell.
+    const barrels = readdirSync(join(srcDir, 'components')).filter((f) => /^index\.(ts|tsx)$/.test(f));
+    expect(barrels).toEqual([]);
+  });
+
+  it('has ZERO non-test importers (only test files may reference the shell)', () => {
+    for (const f of sourceFiles) {
+      if (f === shellFile) continue;
+      expect(readFileSync(f, 'utf8').includes('GuidedRecoveryShell')).toBe(false);
+    }
+  });
+
+  it('is not imported by App, appMachine, persistence, session, or any live component', () => {
+    const wiringCorpus = sourceFiles
+      .filter(
+        (f) =>
+          f.includes('/machine/') ||
+          f.includes('/components/') ||
+          f.endsWith('App.tsx') ||
+          f.endsWith('persistence.ts') ||
+          f.endsWith('session.ts'),
+      )
+      .map((f) => readFileSync(f, 'utf8'))
+      .join('\n');
+    for (const token of ['GuidedRecoveryShell', 'GUIDED_RECOVERY_SHELL', 'GuidedRecovery']) {
+      expect(wiringCorpus.includes(token)).toBe(false);
+    }
+  });
+
+  it('adds no Guided Recovery route, navigation, appMachine state, or persisted/session field', () => {
+    // No runtime file (machine/App/persistence/session) references Guided
+    // Recovery at all, so there is no route, nav item, machine state, or field.
+    const runtimeCorpus = sourceFiles
+      .filter(
+        (f) =>
+          f.includes('/machine/') || f.endsWith('App.tsx') || f.endsWith('persistence.ts') || f.endsWith('session.ts'),
+      )
+      .map((f) => readFileSync(f, 'utf8'))
+      .join('\n');
+    for (const token of ['GuidedRecovery', 'guided recovery', 'guidedRecovery']) {
+      expect(runtimeCorpus.includes(token)).toBe(false);
+    }
+  });
+
+  it('is inert + pure (no imports, no handlers, no clock/randomness/I/O)', () => {
+    const src = readShell();
+    const imports = src.split('\n').filter((l) => /^\s*import\b/.test(l));
+    // Preferred Phase 3-4 behavior: no imports at all (automatic JSX runtime).
+    // Any import that exists must be type-only and never runtime/app/diagnostic.
+    for (const line of imports) expect(/^\s*import\s+type\b/.test(line)).toBe(true);
+    const importText = imports.join('\n');
+    for (const mod of [
+      'guidedRecoveryMicroSteps',
+      'guidedRecoveryCopy',
+      'guidedRecoveryBoundary',
+      'xstate',
+      '/machine/',
+      'persistence',
+      'session',
+      'detectTrapDiagnostic',
+      'doorAuditLite',
+      'diagnosticReadoutCopy',
+    ]) {
+      expect(importText).not.toContain(mod);
+    }
+    const code = codeOf(src);
+    for (const token of [
+      'new Date',
+      'Date.now',
+      'Math.random',
+      'fetch(',
+      'localStorage',
+      'indexedDB',
+      'XMLHttpRequest',
+      'new WebSocket',
+      'onClick',
+      'onSubmit',
+      'onKeyDown',
+      'href=',
+      'role="button"',
+      'tabIndex',
+    ]) {
+      expect(code).not.toContain(token);
+    }
+  });
+
+  it('calls no Guided Recovery / diagnostic getter, evaluator, or factory', () => {
+    const code = codeOf(readShell());
+    for (const call of [
+      'getGuidedRecoveryMicroStepCatalog(',
+      'getGuidedRecoveryStageCopyContract(',
+      'getGuidedRecoveryCopyContract(',
+      'evaluateGuidedRecoveryBoundary(',
+      'createInactiveGuidedRecoveryState(',
+      'createAvailableGuidedRecoveryState(',
+      'isGuidedRecoveryState(',
+      'detectTrapDiagnostic(',
+      'summarizeDoorAuditLite(',
+      'getDiagnosticCopyContract(',
+    ]) {
+      expect(code).not.toContain(call);
+    }
+  });
+});
